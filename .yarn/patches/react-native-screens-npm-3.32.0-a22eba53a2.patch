@@ -1,0 +1,862 @@
+diff --git a/RNScreens.podspec b/RNScreens.podspec
+index fccadeaae775dce9eab09692084d041dc477361f..8303d8a195b927b796f335c624689bf670d0e48e 100644
+--- a/RNScreens.podspec
++++ b/RNScreens.podspec
+@@ -4,7 +4,7 @@ package = JSON.parse(File.read(File.join(__dir__, "package.json")))
+ 
+ new_arch_enabled = ENV['RCT_NEW_ARCH_ENABLED'] == '1'
+ platform = new_arch_enabled ? "11.0" : "9.0"
+-source_files = new_arch_enabled ? 'ios/**/*.{h,m,mm,cpp}' : ["ios/**/*.{h,m,mm}", "cpp/**/*.{cpp,h}"]
++source_files = new_arch_enabled ? 'ios/**/*.{h,m,mm,cpp}' : ["ios/**/*.{h,m,mm}", "cpp/RNScreensTurboModule.cpp", "cpp/RNScreensTurboModule.h"]
+ 
+ folly_compiler_flags = '-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1 -Wno-comma -Wno-shorten-64-to-32'
+ 
+diff --git a/android/CMakeLists.txt b/android/CMakeLists.txt
+index 8d549009af54fd448822cd47bac322a66979cd26..e0108d5eb5609031b3f3afe0cc9f49fb6f7ca0a8 100644
+--- a/android/CMakeLists.txt
++++ b/android/CMakeLists.txt
+@@ -2,11 +2,22 @@ cmake_minimum_required(VERSION 3.9.0)
+ 
+ project(rnscreens)
+ 
++if(${RNS_NEW_ARCH_ENABLED})
+ add_library(rnscreens
+     SHARED
+     ../cpp/RNScreensTurboModule.cpp
++    ../cpp/RNSScreenRemovalListener.cpp
+     ./src/main/cpp/jni-adapter.cpp
++    ./src/main/cpp/NativeProxy.cpp
++    ./src/main/cpp/OnLoad.cpp
+ )
++else()
++add_library(rnscreens
++    SHARED
++    ../cpp/RNScreensTurboModule.cpp
++    ./src/main/cpp/jni-adapter.cpp
++)
++endif()
+ 
+ include_directories(
+     ../cpp
+@@ -19,9 +30,42 @@ set_target_properties(rnscreens PROPERTIES
+     POSITION_INDEPENDENT_CODE ON
+ )
+ 
++target_compile_definitions(
++    rnscreens
++    PRIVATE
++    -DFOLLY_NO_CONFIG=1
++)
++
+ find_package(ReactAndroid REQUIRED CONFIG)
+ 
+-target_link_libraries(rnscreens
+-    ReactAndroid::jsi
+-    android
+-)
++if(${RNS_NEW_ARCH_ENABLED})
++    find_package(fbjni REQUIRED CONFIG)
++    
++    target_link_libraries(
++        rnscreens
++            ReactAndroid::jsi
++            ReactAndroid::react_nativemodule_core
++            ReactAndroid::react_utils
++            ReactAndroid::reactnativejni
++            ReactAndroid::fabricjni
++            ReactAndroid::react_debug
++            ReactAndroid::react_render_core
++            ReactAndroid::runtimeexecutor
++            ReactAndroid::react_render_graphics
++            ReactAndroid::rrc_view
++            ReactAndroid::yoga
++            ReactAndroid::rrc_text
++            ReactAndroid::glog
++            ReactAndroid::react_render_componentregistry
++            ReactAndroid::react_render_mounting
++            ReactAndroid::react_render_scheduler
++            ReactAndroid::react_render_uimanager
++            fbjni::fbjni
++            android
++    )
++else()
++    target_link_libraries(rnscreens
++        ReactAndroid::jsi
++        android
++    )
++endif()
+\ No newline at end of file
+diff --git a/android/build.gradle b/android/build.gradle
+index b2a4b88a151426e97f9a9ab816b77587076d8c11..be76afb7444cd64e8313ee299f735542171d5f8a 100644
+--- a/android/build.gradle
++++ b/android/build.gradle
+@@ -81,6 +81,7 @@ def reactProperties = new Properties()
+ file("$reactNativeRootDir/ReactAndroid/gradle.properties").withInputStream { reactProperties.load(it) }
+ def REACT_NATIVE_VERSION = reactProperties.getProperty("VERSION_NAME")
+ def REACT_NATIVE_MINOR_VERSION = REACT_NATIVE_VERSION.startsWith("0.0.0-") ? 1000 : REACT_NATIVE_VERSION.split("\\.")[1].toInteger()
++def IS_NEW_ARCHITECTURE_ENABLED = isNewArchitectureEnabled()
+ 
+ android {
+     compileSdkVersion safeExtGet('compileSdkVersion', rnsDefaultCompileSdkVersion)
+@@ -112,7 +113,8 @@ android {
+         }
+         externalNativeBuild {
+             cmake {
+-                arguments "-DANDROID_STL=c++_shared"
++                arguments "-DANDROID_STL=c++_shared",
++                    "-DRNS_NEW_ARCH_ENABLED=${IS_NEW_ARCHITECTURE_ENABLED}"
+             }
+         }
+     }
+diff --git a/android/src/fabric/java/com/swmansion/rnscreens/NativeProxy.kt b/android/src/fabric/java/com/swmansion/rnscreens/NativeProxy.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..f4d9cb965a71d3b3d71eda4114595d64829bb75b
+--- /dev/null
++++ b/android/src/fabric/java/com/swmansion/rnscreens/NativeProxy.kt
+@@ -0,0 +1,53 @@
++package com.swmansion.rnscreens
++
++import android.util.Log
++import com.facebook.jni.HybridData
++import com.facebook.proguard.annotations.DoNotStrip
++import com.facebook.react.fabric.FabricUIManager
++import java.lang.ref.WeakReference
++import java.util.concurrent.ConcurrentHashMap
++
++class NativeProxy {
++    @DoNotStrip
++    @Suppress("unused")
++    private val mHybridData: HybridData
++
++    init {
++        mHybridData = initHybrid()
++    }
++
++    private external fun initHybrid(): HybridData
++
++    external fun nativeAddMutationsListener(fabricUIManager: FabricUIManager)
++
++    companion object {
++        // we use ConcurrentHashMap here since it will be read on the JS thread,
++        // and written to on the UI thread.
++        private val viewsMap = ConcurrentHashMap<Int, WeakReference<Screen>>()
++
++        fun addScreenToMap(
++            tag: Int,
++            view: Screen,
++        ) {
++            viewsMap[tag] = WeakReference(view)
++        }
++
++        fun removeScreenFromMap(tag: Int) {
++            viewsMap.remove(tag)
++        }
++
++        fun clearMapOnInvalidate() {
++            viewsMap.clear()
++        }
++    }
++
++    @DoNotStrip
++    public fun notifyScreenRemoved(screenTag: Int) {
++        val screen = viewsMap[screenTag]?.get()
++        if (screen is Screen) {
++            screen.startRemovalTransition()
++        } else {
++            Log.w("[RNScreens]", "Did not find view with tag $screenTag.")
++        }
++    }
++}
+\ No newline at end of file
+diff --git a/android/src/main/cpp/NativeProxy.cpp b/android/src/main/cpp/NativeProxy.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..f4d9cb965a71d3b3d71eda4114595d64829bb75b
+--- /dev/null
++++ b/android/src/main/cpp/NativeProxy.cpp
+@@ -0,0 +1,51 @@
++#include <fbjni/fbjni.h>
++#include <react/fabric/Binding.h>
++#include <react/renderer/scheduler/Scheduler.h>
++
++#include <string>
++
++#include "NativeProxy.h"
++
++using namespace facebook;
++using namespace react;
++
++namespace rnscreens {
++
++NativeProxy::NativeProxy(jni::alias_ref<NativeProxy::javaobject> jThis)
++    : javaPart_(jni::make_global(jThis)) {}
++
++NativeProxy::~NativeProxy() {}
++
++void NativeProxy::registerNatives() {
++  registerHybrid(
++      {makeNativeMethod("initHybrid", NativeProxy::initHybrid),
++       makeNativeMethod(
++           "nativeAddMutationsListener",
++           NativeProxy::nativeAddMutationsListener)});
++}
++
++void NativeProxy::nativeAddMutationsListener(
++    jni::alias_ref<facebook::react::JFabricUIManager::javaobject>
++        fabricUIManager) {
++  auto uiManager =
++      fabricUIManager->getBinding()->getScheduler()->getUIManager();
++  screenRemovalListener_ =
++      std::make_shared<RNSScreenRemovalListener>([this](int tag) {
++        static const auto method =
++            javaPart_->getClass()->getMethod<void(jint)>("notifyScreenRemoved");
++        method(javaPart_, tag);
++      });
++
++  uiManager->getShadowTreeRegistry().enumerate(
++      [this](const facebook::react::ShadowTree &shadowTree, bool &stop) {
++        shadowTree.getMountingCoordinator()->setMountingOverrideDelegate(
++            screenRemovalListener_);
++      });
++}
++
++jni::local_ref<NativeProxy::jhybriddata> NativeProxy::initHybrid(
++    jni::alias_ref<jhybridobject> jThis) {
++  return makeCxxInstance(jThis);
++}
++
++} // namespace rnscreens
+\ No newline at end of file
+diff --git a/android/src/main/cpp/NativeProxy.h b/android/src/main/cpp/NativeProxy.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..289998b6f39d4da1109b0a7196bdd9c0002f6504
+--- /dev/null
++++ b/android/src/main/cpp/NativeProxy.h
+@@ -0,0 +1,35 @@
++#pragma once
++
++#include <fbjni/fbjni.h>
++#include <react/fabric/JFabricUIManager.h>
++#include "RNSScreenRemovalListener.h"
++
++#include <string>
++
++namespace rnscreens {
++using namespace facebook;
++using namespace facebook::jni;
++
++class NativeProxy : public jni::HybridClass<NativeProxy> {
++ public:
++  std::shared_ptr<RNSScreenRemovalListener> screenRemovalListener_;
++  static auto constexpr kJavaDescriptor =
++      "Lcom/swmansion/rnscreens/NativeProxy;";
++  static jni::local_ref<jhybriddata> initHybrid(
++      jni::alias_ref<jhybridobject> jThis);
++  static void registerNatives();
++
++  ~NativeProxy();
++
++ private:
++  friend HybridBase;
++  jni::global_ref<NativeProxy::javaobject> javaPart_;
++
++  explicit NativeProxy(jni::alias_ref<NativeProxy::javaobject> jThis);
++
++  void nativeAddMutationsListener(
++      jni::alias_ref<facebook::react::JFabricUIManager::javaobject>
++          fabricUIManager);
++};
++
++} // namespace rnscreens
+\ No newline at end of file
+diff --git a/android/src/main/cpp/OnLoad.cpp b/android/src/main/cpp/OnLoad.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..b3c84a5391dc9170304df63a331e077093780bcb
+--- /dev/null
++++ b/android/src/main/cpp/OnLoad.cpp
+@@ -0,0 +1,8 @@
++#include <fbjni/fbjni.h>
++
++#include "NativeProxy.h"
++
++JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *) {
++  return facebook::jni::initialize(
++      vm, [] { rnscreens::NativeProxy::registerNatives(); });
++}
+\ No newline at end of file
+diff --git a/android/src/main/java/com/swmansion/rnscreens/Screen.kt b/android/src/main/java/com/swmansion/rnscreens/Screen.kt
+index 4eacaf0e4c6fa7c97c621449665fd2a77f5773af..66019d7173f89c8af4eb0274919544a399e35837 100644
+--- a/android/src/main/java/com/swmansion/rnscreens/Screen.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/Screen.kt
+@@ -6,6 +6,8 @@ import android.graphics.Paint
+ import android.os.Parcelable
+ import android.util.SparseArray
+ import android.util.TypedValue
++import android.view.View
++import com.facebook.react.views.scroll.ReactScrollView
+ import android.view.ViewGroup
+ import android.view.WindowManager
+ import android.webkit.WebView
+@@ -35,6 +37,7 @@ class Screen(context: ReactContext?) : FabricEnabledViewGroup(context) {
+     var screenOrientation: Int? = null
+         private set
+     var isStatusBarAnimated: Boolean? = null
++    var isBeingRemoved = false
+ 
+     init {
+         // we set layout params as WindowManager.LayoutParams to workaround the issue with TextInputs
+@@ -246,6 +249,49 @@ class Screen(context: ReactContext?) : FabricEnabledViewGroup(context) {
+ 
+     var nativeBackButtonDismissalEnabled: Boolean = true
+ 
++    fun startRemovalTransition() {
++        if (!isBeingRemoved) {
++            isBeingRemoved = true
++            startTransitionRecursive(this)
++        }
++    }
++
++    private fun startTransitionRecursive(parent: ViewGroup?) {
++        parent?.let {
++            for (i in 0 until it.childCount) {
++                val child = it.getChildAt(i)
++                if (child.javaClass.simpleName.equals("CircleImageView")) {
++                    // SwipeRefreshLayout class which has CircleImageView as a child,
++                    // does not handle `startViewTransition` properly.
++                    // It has a custom `getChildDrawingOrder` method which returns
++                    // wrong index if we called `startViewTransition` on the views on new arch.
++                    // We add a simple View to bump the number of children to make it work.
++                    // TODO: find a better way to handle this scenario
++                    it.addView(View(context), i)
++                } else {
++                    child?.let { view -> it.startViewTransition(view) }
++                }
++                if (child is ScreenStackHeaderConfig) {
++                    // we want to start transition on children of the toolbar too,
++                    // which is not a child of ScreenStackHeaderConfig
++                    startTransitionRecursive(child.toolbar)
++                }
++                if (child is ViewGroup) {
++                    // The children are miscounted when there's a FlatList with
++                    // removeCLippedSubviews set to true (default).
++                    // We add a simple view for each item in the list to make it work as expected.
++                    // See https://github.com/software-mansion/react-native-screens/issues/2282
++                    if (it is ReactScrollView && it.removeClippedSubviews) {
++                        for (j in 0 until child.childCount) {
++                            child.addView(View(context))
++                        }
++                    }
++                    startTransitionRecursive(child)
++                }
++            }
++        }
++    }
++
+     private fun calculateHeaderHeight(): Pair<Double, Double> {
+         val actionBarTv = TypedValue()
+         val resolvedActionBarSize = context.theme.resolveAttribute(android.R.attr.actionBarSize, actionBarTv, true)
+diff --git a/android/src/main/java/com/swmansion/rnscreens/ScreenStackHeaderConfig.kt b/android/src/main/java/com/swmansion/rnscreens/ScreenStackHeaderConfig.kt
+index 004cf9838636fa36d7351b94b338c36765d91dbb..d4a1209a5e48d028b0042c7d677d444595404fec 100644
+--- a/android/src/main/java/com/swmansion/rnscreens/ScreenStackHeaderConfig.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/ScreenStackHeaderConfig.kt
+@@ -284,7 +284,7 @@ class ScreenStackHeaderConfig(context: Context) : ViewGroup(context) {
+     }
+ 
+     private fun maybeUpdate() {
+-        if (parent != null && !isDestroyed) {
++        if (parent != null && !isDestroyed && screen?.isBeingRemoved == false) {
+             onUpdate()
+         }
+     }
+diff --git a/android/src/main/java/com/swmansion/rnscreens/ScreenStackHeaderConfigViewManager.kt b/android/src/main/java/com/swmansion/rnscreens/ScreenStackHeaderConfigViewManager.kt
+index 02fe8dc2d5e46876514c6fd91fd2577b1118ca90..75d9aae12f8a1b80c6a1d7f98d0877c799deb58d 100644
+--- a/android/src/main/java/com/swmansion/rnscreens/ScreenStackHeaderConfigViewManager.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/ScreenStackHeaderConfigViewManager.kt
+@@ -151,7 +151,7 @@ class ScreenStackHeaderConfigViewManager : ViewGroupManager<ScreenStackHeaderCon
+ 
+     // TODO: Find better way to handle platform specific props
+     private fun logNotAvailable(propName: String) {
+-        Log.w("RN SCREENS", "$propName prop is not available on Android")
++        Log.w("[RNScreens]", "$propName prop is not available on Android")
+     }
+ 
+     override fun setBackTitle(view: ScreenStackHeaderConfig?, value: String?) {
+diff --git a/android/src/main/java/com/swmansion/rnscreens/ScreenStackViewManager.kt b/android/src/main/java/com/swmansion/rnscreens/ScreenStackViewManager.kt
+index cbbf0d5209e5be60dd2a3b7d140260e5eb595200..81eb602df3f11976cc1c4927bcb823c82e96ccfe 100644
+--- a/android/src/main/java/com/swmansion/rnscreens/ScreenStackViewManager.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/ScreenStackViewManager.kt
+@@ -1,7 +1,6 @@
+ package com.swmansion.rnscreens
+ 
+ import android.view.View
+-import android.view.ViewGroup
+ import com.facebook.react.bridge.ReactApplicationContext
+ import com.facebook.react.module.annotations.ReactModule
+ import com.facebook.react.uimanager.LayoutShadowNode
+@@ -26,33 +25,24 @@ class ScreenStackViewManager : ViewGroupManager<ScreenStack>(), RNSScreenStackMa
+ 
+     override fun addView(parent: ScreenStack, child: View, index: Int) {
+         require(child is Screen) { "Attempt attach child that is not of type RNScreen" }
++        NativeProxy.addScreenToMap(child.id, child)
+         parent.addScreen(child, index)
+     }
+ 
+     override fun removeViewAt(parent: ScreenStack, index: Int) {
+-        prepareOutTransition(parent.getScreenAt(index))
++        val screen = parent.getScreenAt(index)
++        prepareOutTransition(screen)
+         parent.removeScreenAt(index)
++        NativeProxy.removeScreenFromMap(screen.id)
+     }
+ 
+     private fun prepareOutTransition(screen: Screen?) {
+-        startTransitionRecursive(screen)
++        screen?.startRemovalTransition()
+     }
+ 
+-    private fun startTransitionRecursive(parent: ViewGroup?) {
+-        parent?.let {
+-            for (i in 0 until it.childCount) {
+-                val child = it.getChildAt(i)
+-                child?.let { view -> it.startViewTransition(view) }
+-                if (child is ScreenStackHeaderConfig) {
+-                    // we want to start transition on children of the toolbar too,
+-                    // which is not a child of ScreenStackHeaderConfig
+-                    startTransitionRecursive(child.toolbar)
+-                }
+-                if (child is ViewGroup) {
+-                    startTransitionRecursive(child)
+-                }
+-            }
+-        }
++    override fun invalidate() {
++        super.invalidate()
++        NativeProxy.clearMapOnInvalidate()
+     }
+ 
+     override fun getChildCount(parent: ScreenStack) = parent.screenCount
+diff --git a/android/src/main/java/com/swmansion/rnscreens/ScreensModule.kt b/android/src/main/java/com/swmansion/rnscreens/ScreensModule.kt
+index e2f533200140eb251c85e5281ec9fb78d19f3111..4669af69527da9596cce7be46b32fcf85338a6ab 100644
+--- a/android/src/main/java/com/swmansion/rnscreens/ScreensModule.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/ScreensModule.kt
+@@ -4,9 +4,11 @@ import android.util.Log
+ import com.facebook.proguard.annotations.DoNotStrip
+ import com.facebook.react.bridge.ReactApplicationContext
+ import com.facebook.react.bridge.UiThreadUtil
++import com.facebook.react.fabric.FabricUIManager
+ import com.facebook.react.module.annotations.ReactModule
+ import com.facebook.react.uimanager.UIManagerHelper
+ import com.swmansion.rnscreens.events.ScreenTransitionProgressEvent
++import com.facebook.react.uimanager.common.UIManagerType
+ import java.util.concurrent.atomic.AtomicBoolean
+ 
+ @ReactModule(name = ScreensModule.NAME)
+@@ -15,6 +17,7 @@ class ScreensModule(private val reactContext: ReactApplicationContext)
+ {
+     private var topScreenId: Int = -1
+     private val isActiveTransition = AtomicBoolean(false)
++    private var proxy: NativeProxy? = null
+ 
+     init {
+         try {
+@@ -32,6 +35,18 @@ class ScreensModule(private val reactContext: ReactApplicationContext)
+ 
+     private external fun nativeInstall(jsiPtr: Long)
+ 
++    override fun initialize() {
++        super.initialize()
++        if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
++            val fabricUIManager =
++                UIManagerHelper.getUIManager(reactContext, UIManagerType.FABRIC) as FabricUIManager
++            proxy =
++                NativeProxy().apply {
++                    nativeAddMutationsListener(fabricUIManager)
++                }
++        }
++    }
++
+     override fun getName(): String = NAME
+ 
+     @DoNotStrip
+diff --git a/android/src/main/java/com/swmansion/rnscreens/SearchBarManager.kt b/android/src/main/java/com/swmansion/rnscreens/SearchBarManager.kt
+index 8c674cec3de609854148bae1d614ea1ad8ee96f4..e46a9e6f057542241dd1b8382f6f56323003d4af 100644
+--- a/android/src/main/java/com/swmansion/rnscreens/SearchBarManager.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/SearchBarManager.kt
+@@ -132,7 +132,7 @@ class SearchBarManager : ViewGroupManager<SearchBarView>(), RNSSearchBarManagerI
+     }
+ 
+     private fun logNotAvailable(propName: String) {
+-        Log.w("RN SCREENS", "$propName prop is not available on Android")
++        Log.w("[RNScreens]", "$propName prop is not available on Android")
+     }
+ 
+     // NativeCommands
+diff --git a/android/src/main/res/v33/anim-v33/rns_default_enter_in.xml b/android/src/main/res/v33/anim-v33/rns_default_enter_in.xml
+deleted file mode 100644
+index 17672035117bbfc04e88ccb8d319a2e5896d76e2..0000000000000000000000000000000000000000
+--- a/android/src/main/res/v33/anim-v33/rns_default_enter_in.xml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-<?xml version="1.0" encoding="utf-8"?>
+-
+-<set xmlns:android="http://schemas.android.com/apk/res/android"
+-    android:shareInterpolator="false">
+-
+-    <alpha
+-        android:fromAlpha="0.0"
+-        android:toAlpha="1.0"
+-        android:fillEnabled="true"
+-        android:fillBefore="true"
+-        android:fillAfter="true"
+-        android:interpolator="@android:anim/linear_interpolator"
+-        android:startOffset="50"
+-        android:duration="83" />
+-
+-    <translate
+-        android:fromXDelta="10%"
+-        android:toXDelta="0"
+-        android:fillEnabled="true"
+-        android:fillBefore="true"
+-        android:fillAfter="true"
+-        android:interpolator="@android:interpolator/fast_out_extra_slow_in"
+-        android:duration="450" />
+-
+-    <extend
+-        android:fromExtendLeft="10%"
+-        android:fromExtendTop="0"
+-        android:fromExtendRight="0"
+-        android:fromExtendBottom="0"
+-        android:toExtendLeft="10%"
+-        android:toExtendTop="0"
+-        android:toExtendRight="0"
+-        android:toExtendBottom="0"
+-        android:interpolator="@android:interpolator/fast_out_extra_slow_in"
+-        android:startOffset="0"
+-        android:duration="450" />
+-</set>
+diff --git a/android/src/main/res/v33/anim-v33/rns_default_enter_out.xml b/android/src/main/res/v33/anim-v33/rns_default_enter_out.xml
+deleted file mode 100644
+index e7dd72bba597a98410f33d80d4b5d32fee7a76a1..0000000000000000000000000000000000000000
+--- a/android/src/main/res/v33/anim-v33/rns_default_enter_out.xml
++++ /dev/null
+@@ -1,38 +0,0 @@
+-<?xml version="1.0" encoding="utf-8"?>
+-
+-<set xmlns:android="http://schemas.android.com/apk/res/android"
+-    android:shareInterpolator="false">
+-
+-    <alpha
+-        android:fromAlpha="1.0"
+-        android:toAlpha="1.0"
+-        android:fillEnabled="true"
+-        android:fillBefore="true"
+-        android:fillAfter="true"
+-        android:interpolator="@anim/rns_standard_accelerate_interpolator"
+-        android:startOffset="0"
+-        android:duration="450" />
+-
+-    <translate
+-        android:fromXDelta="0"
+-        android:toXDelta="-10%"
+-        android:fillEnabled="true"
+-        android:fillBefore="true"
+-        android:fillAfter="true"
+-        android:interpolator="@android:interpolator/fast_out_extra_slow_in"
+-        android:startOffset="0"
+-        android:duration="450" />
+-
+-    <extend
+-        android:fromExtendLeft="0"
+-        android:fromExtendTop="0"
+-        android:fromExtendRight="10%"
+-        android:fromExtendBottom="0"
+-        android:toExtendLeft="0"
+-        android:toExtendTop="0"
+-        android:toExtendRight="10%"
+-        android:toExtendBottom="0"
+-        android:interpolator="@android:interpolator/fast_out_extra_slow_in"
+-        android:startOffset="0"
+-        android:duration="450" />
+-</set>
+diff --git a/android/src/main/res/v33/anim-v33/rns_default_exit_in.xml b/android/src/main/res/v33/anim-v33/rns_default_exit_in.xml
+deleted file mode 100644
+index 949ebb776d7c153d3e858bee5740ee018dfc2f62..0000000000000000000000000000000000000000
+--- a/android/src/main/res/v33/anim-v33/rns_default_exit_in.xml
++++ /dev/null
+@@ -1,38 +0,0 @@
+-<?xml version="1.0" encoding="utf-8"?>
+-
+-<set xmlns:android="http://schemas.android.com/apk/res/android"
+-    android:shareInterpolator="false">
+-
+-    <alpha
+-        android:fromAlpha="1.0"
+-        android:toAlpha="1.0"
+-        android:fillEnabled="true"
+-        android:fillBefore="true"
+-        android:fillAfter="true"
+-        android:interpolator="@android:interpolator/linear"
+-        android:startOffset="0"
+-        android:duration="450" />
+-
+-    <translate
+-        android:fromXDelta="-10%"
+-        android:toXDelta="0"
+-        android:fillEnabled="true"
+-        android:fillBefore="true"
+-        android:fillAfter="true"
+-        android:interpolator="@android:interpolator/fast_out_extra_slow_in"
+-        android:startOffset="0"
+-        android:duration="450" />
+-
+-    <extend
+-        android:fromExtendLeft="0"
+-        android:fromExtendTop="0"
+-        android:fromExtendRight="10%"
+-        android:fromExtendBottom="0"
+-        android:toExtendLeft="0"
+-        android:toExtendTop="0"
+-        android:toExtendRight="10%"
+-        android:toExtendBottom="0"
+-        android:interpolator="@android:interpolator/fast_out_extra_slow_in"
+-        android:startOffset="0"
+-        android:duration="450" />
+-</set>
+diff --git a/android/src/main/res/v33/anim-v33/rns_default_exit_out.xml b/android/src/main/res/v33/anim-v33/rns_default_exit_out.xml
+deleted file mode 100644
+index ba4d84d6cdfda875f9b7b002f4e3806624e95a75..0000000000000000000000000000000000000000
+--- a/android/src/main/res/v33/anim-v33/rns_default_exit_out.xml
++++ /dev/null
+@@ -1,38 +0,0 @@
+-<?xml version="1.0" encoding="utf-8"?>
+-
+-<set xmlns:android="http://schemas.android.com/apk/res/android"
+-    android:shareInterpolator="false">
+-
+-    <alpha
+-        android:fromAlpha="1.0"
+-        android:toAlpha="0.0"
+-        android:fillEnabled="true"
+-        android:fillBefore="true"
+-        android:fillAfter="true"
+-        android:interpolator="@android:interpolator/linear"
+-        android:startOffset="35"
+-        android:duration="83" />
+-
+-    <translate
+-        android:fromXDelta="0"
+-        android:toXDelta="10%"
+-        android:fillEnabled="true"
+-        android:fillBefore="true"
+-        android:fillAfter="true"
+-        android:interpolator="@android:interpolator/fast_out_extra_slow_in"
+-        android:startOffset="0"
+-        android:duration="450" />
+-
+-    <extend
+-        android:fromExtendLeft="10%"
+-        android:fromExtendTop="0"
+-        android:fromExtendRight="0"
+-        android:fromExtendBottom="0"
+-        android:toExtendLeft="10%"
+-        android:toExtendTop="0"
+-        android:toExtendRight="0"
+-        android:toExtendBottom="0"
+-        android:interpolator="@android:interpolator/fast_out_extra_slow_in"
+-        android:startOffset="0"
+-        android:duration="450" />
+-</set>
+diff --git a/android/src/paper/java/com/swmansion/rnscreens/NativeProxy.kt b/android/src/paper/java/com/swmansion/rnscreens/NativeProxy.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..1c875d0d5bcfdaaa97798f530946737b97550d72
+--- /dev/null
++++ b/android/src/paper/java/com/swmansion/rnscreens/NativeProxy.kt
+@@ -0,0 +1,19 @@
++package com.swmansion.rnscreens
++
++import com.facebook.react.fabric.FabricUIManager
++
++class NativeProxy {
++    // do nothing on Paper
++    fun nativeAddMutationsListener(fabricUIManager: FabricUIManager) = Unit
++
++    companion object {
++        fun addScreenToMap(
++            tag: Int,
++            view: Screen,
++        ) = Unit
++
++        fun removeScreenFromMap(tag: Int) = Unit
++
++        fun clearMapOnInvalidate() = Unit
++    }
++}
+\ No newline at end of file
+diff --git a/cpp/RNSScreenRemovalListener.cpp b/cpp/RNSScreenRemovalListener.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..54f0d67be98ec5fbedde3b89ec719209ebd92f30
+--- /dev/null
++++ b/cpp/RNSScreenRemovalListener.cpp
+@@ -0,0 +1,25 @@
++#include "RNSScreenRemovalListener.h"
++#include <react/renderer/mounting/ShadowViewMutation.h>
++using namespace facebook::react;
++
++std::optional<MountingTransaction> RNSScreenRemovalListener::pullTransaction(
++    SurfaceId surfaceId,
++    MountingTransaction::Number transactionNumber,
++    const TransactionTelemetry &telemetry,
++    ShadowViewMutationList mutations) const {
++  for (const ShadowViewMutation &mutation : mutations) {
++    if (mutation.type == ShadowViewMutation::Type::Remove &&
++        mutation.oldChildShadowView.componentName != nullptr &&
++        strcmp(mutation.parentShadowView.componentName, "RNSScreenStack") ==
++            0) {
++      listenerFunction_(mutation.oldChildShadowView.tag);
++    }
++  }
++
++  return MountingTransaction{
++      surfaceId, transactionNumber, std::move(mutations), telemetry};
++}
++
++bool RNSScreenRemovalListener::shouldOverridePullTransaction() const {
++  return true;
++}
+\ No newline at end of file
+diff --git a/cpp/RNSScreenRemovalListener.h b/cpp/RNSScreenRemovalListener.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..0bc882104820e4e5b1d16307df6f6709111fc50f
+--- /dev/null
++++ b/cpp/RNSScreenRemovalListener.h
+@@ -0,0 +1,20 @@
++#pragma once
++
++#include <react/renderer/componentregistry/ComponentDescriptorFactory.h>
++#include <react/renderer/mounting/MountingOverrideDelegate.h>
++#include <react/renderer/mounting/ShadowView.h>
++
++using namespace facebook::react;
++
++struct RNSScreenRemovalListener : public MountingOverrideDelegate {
++  std::function<void(int)> listenerFunction_;
++  RNSScreenRemovalListener(std::function<void(int)> &&listenerFunction_)
++      : listenerFunction_(std::move(listenerFunction_)) {}
++
++  bool shouldOverridePullTransaction() const override;
++  std::optional<MountingTransaction> pullTransaction(
++      SurfaceId surfaceId,
++      MountingTransaction::Number number,
++      const TransactionTelemetry &telemetry,
++      ShadowViewMutationList mutations) const override;
++};
+\ No newline at end of file
+diff --git a/ios/RNSModule.mm b/ios/RNSModule.mm
+index be05de43c73ed3bfd2c79e54d56444df1ad97c75..f3f14d34370953d58a51845802773774f13fc829 100644
+--- a/ios/RNSModule.mm
++++ b/ios/RNSModule.mm
+@@ -116,7 +116,7 @@ - (RNSScreenStackView *)getStackView:(NSNumber *)stackTag
+ {
+   RNSScreenStackView *view = [self getScreenStackView:stackTag];
+   if (view != nil && ![view isKindOfClass:[RNSScreenStackView class]]) {
+-    RCTLogError(@"Invalid view type, expecting RNSScreenStackView, got: %@", view);
++    RCTLogError(@"[RNScreens] Invalid view type, expecting RNSScreenStackView, got: %@", view);
+     return nil;
+   }
+   return view;
+diff --git a/ios/RNSScreen.h b/ios/RNSScreen.h
+index bbdedcdb9a4579377545cf011fa8f5d87d0ec05f..ed153fbfa263fc90c414321f3815c6ba430ae79e 100644
+--- a/ios/RNSScreen.h
++++ b/ios/RNSScreen.h
+@@ -40,7 +40,7 @@ namespace react = facebook::react;
+ - (void)notifyFinishTransitioning;
+ - (RNSScreenView *)screenView;
+ #ifdef RCT_NEW_ARCH_ENABLED
+-- (void)setViewToSnapshot:(UIView *)snapshot;
++- (void)setViewToSnapshot;
+ - (CGFloat)calculateHeaderHeightIsModal:(BOOL)isModal;
+ #endif
+ 
+diff --git a/ios/RNSScreen.mm b/ios/RNSScreen.mm
+index ff804e07726dcaf3dddac0134c9863844fd4da58..08da1076b485800edb5fc42e594928714ee9d328 100644
+--- a/ios/RNSScreen.mm
++++ b/ios/RNSScreen.mm
+@@ -1388,12 +1388,16 @@ - (void)hideHeaderIfNecessary
+ #ifdef RCT_NEW_ARCH_ENABLED
+ #pragma mark - Fabric specific
+ 
+-- (void)setViewToSnapshot:(UIView *)snapshot
++- (void)setViewToSnapshot
+ {
+   UIView *superView = self.view.superview;
+-  [self.view removeFromSuperview];
+-  self.view = snapshot;
+-  [superView addSubview:self.view];
++  // if we dismissed the view natively, it will already be detached from view hierarchy
++  if (self.view.window != nil) {
++    UIView *snapshot = [self.view snapshotViewAfterScreenUpdates:NO];
++    [self.view removeFromSuperview];
++    self.view = snapshot;
++    [superView addSubview:snapshot];
++  }
+ }
+ 
+ #else
+diff --git a/ios/RNSScreenStack.mm b/ios/RNSScreenStack.mm
+index 5952d91086df89fa4ba7823ded1fcebdb60ce224..33c88a64e077ffa9bcfeae956f28c285df1b25c1 100644
+--- a/ios/RNSScreenStack.mm
++++ b/ios/RNSScreenStack.mm
+@@ -119,9 +119,6 @@ @implementation RNSScreenStackView {
+   BOOL _hasLayout;
+   __weak RNSScreenStackManager *_manager;
+   BOOL _updateScheduled;
+-#ifdef RCT_NEW_ARCH_ENABLED
+-  UIView *_snapshot;
+-#endif
+ }
+ 
+ #ifdef RCT_NEW_ARCH_ENABLED
+@@ -1176,7 +1173,7 @@ - (void)unmountChildComponentView:(UIView<RCTComponentViewProtocol> *)childCompo
+   if (screenChildComponent.window != nil &&
+       ((screenChildComponent == _controller.visibleViewController.view && _presentedModals.count < 2) ||
+        screenChildComponent == [_presentedModals.lastObject view])) {
+-    [screenChildComponent.controller setViewToSnapshot:_snapshot];
++    [screenChildComponent.controller setViewToSnapshot];
+   }
+ 
+   RCTAssert(
+@@ -1201,22 +1198,12 @@ - (void)unmountChildComponentView:(UIView<RCTComponentViewProtocol> *)childCompo
+   });
+ }
+ 
+-- (void)takeSnapshot
+-{
+-  if (_presentedModals.count < 2) {
+-    _snapshot = [_controller.visibleViewController.view snapshotViewAfterScreenUpdates:NO];
+-  } else {
+-    _snapshot = [[_presentedModals.lastObject view] snapshotViewAfterScreenUpdates:NO];
+-  }
+-}
+-
+ - (void)mountingTransactionWillMount:(react::MountingTransaction const &)transaction
+                 withSurfaceTelemetry:(react::SurfaceTelemetry const &)surfaceTelemetry
+ {
+   for (auto &mutation : transaction.getMutations()) {
+     if (mutation.type == react::ShadowViewMutation::Type::Remove && mutation.parentShadowView.componentName != nil &&
+         strcmp(mutation.parentShadowView.componentName, "RNSScreenStack") == 0) {
+-      [self takeSnapshot];
+       return;
+     }
+   }
+diff --git a/src/native-stack/views/NativeStackView.tsx b/src/native-stack/views/NativeStackView.tsx
+index 213b1c1322a694a0d6077cf20bdc5baadaafa935..332d108d61b80d6882db66febeac481827077d57 100644
+--- a/src/native-stack/views/NativeStackView.tsx
++++ b/src/native-stack/views/NativeStackView.tsx
+@@ -309,7 +309,7 @@ const RouteView = ({
+       statusBarAnimation={statusBarAnimation}
+       statusBarColor={statusBarColor}
+       statusBarHidden={statusBarHidden}
+-      statusBarStyle={statusBarStyle ?? (dark ? 'light' : 'dark')}
++      statusBarStyle={statusBarStyle}
+       statusBarTranslucent={statusBarTranslucent}
+       swipeDirection={swipeDirection}
+       transitionDuration={transitionDuration}

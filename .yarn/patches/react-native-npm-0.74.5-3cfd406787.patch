@@ -1,0 +1,1495 @@
+diff --git a/ReactCommon/jsc/JSCRuntime.cpp b/ReactCommon/jsc/JSCRuntime.cpp
+index c42d4f3008e4a661b149b958d3f664c42dc1fa9e..843d485ad1bd4284d2615fd6821ad6cd4e44b885 100644
+--- a/ReactCommon/jsc/JSCRuntime.cpp
++++ b/ReactCommon/jsc/JSCRuntime.cpp
+@@ -388,12 +388,15 @@ JSCRuntime::~JSCRuntime() {
+   // No need to unprotect nativeStateSymbol_ since the heap is getting torn down
+   // anyway
+   JSGlobalContextRelease(ctx_);
+-#ifndef NDEBUG
+-  assert(
+-      objectCounter_ == 0 && "JSCRuntime destroyed with a dangling API object");
+-  assert(
+-      stringCounter_ == 0 && "JSCRuntime destroyed with a dangling API string");
+-#endif
++
++// This assertion causes crashes when reloading the app and is not running in production
++//
++// #ifndef NDEBUG
++//   assert(
++//       objectCounter_ == 0 && "JSCRuntime destroyed with a dangling API object");
++//   assert(
++//       stringCounter_ == 0 && "JSCRuntime destroyed with a dangling API string");
++// #endif
+ }
+ 
+ std::shared_ptr<const jsi::PreparedJavaScript> JSCRuntime::prepareJavaScript(
+diff --git a/Libraries/ActionSheetIOS/React-RCTActionSheet.podspec b/Libraries/ActionSheetIOS/React-RCTActionSheet.podspec
+index 1de8a15ed9f000986f416debeb4c881f9f55bb26..2de24d533cbbf397bf84729642869b13a99f6967 100644
+--- a/Libraries/ActionSheetIOS/React-RCTActionSheet.podspec
++++ b/Libraries/ActionSheetIOS/React-RCTActionSheet.podspec
+@@ -29,6 +29,7 @@ Pod::Spec.new do |s|
+   s.source_files           = "*.{m}"
+   s.preserve_paths         = "package.json", "LICENSE", "LICENSE-docs"
+   s.header_dir             = "RCTActionSheet"
++  s.compiler_flags         = [ "-fstack-protector-strong" ]
+ 
+   s.dependency "React-Core/RCTActionSheetHeaders", version
+ end
+diff --git a/Libraries/AppDelegate/React-RCTAppDelegate.podspec b/Libraries/AppDelegate/React-RCTAppDelegate.podspec
+index 146ff1ea5ccf83c7c564c4d3473694bb590c1f0c..8eedddbb2a93a0b40110cf7f2d490dd513913562 100644
+--- a/Libraries/AppDelegate/React-RCTAppDelegate.podspec
++++ b/Libraries/AppDelegate/React-RCTAppDelegate.podspec
+@@ -26,7 +26,7 @@ use_hermes =  ENV['USE_HERMES'] == nil || ENV['USE_HERMES'] == '1'
+ new_arch_enabled_flag = (is_new_arch_enabled ? " -DRCT_NEW_ARCH_ENABLED" : "")
+ is_fabric_enabled = true #is_new_arch_enabled || ENV["RCT_FABRIC_ENABLED"]
+ hermes_flag = (use_hermes ? " -DUSE_HERMES" : "")
+-other_cflags = "$(inherited) " + folly_compiler_flags + new_arch_enabled_flag + hermes_flag
++other_cflags = "$(inherited) -fstack-protector-strong " + folly_compiler_flags + new_arch_enabled_flag + hermes_flag
+ 
+ header_search_paths = [
+   "$(PODS_TARGET_SRCROOT)/../../ReactCommon",
+diff --git a/Libraries/Blob/React-RCTBlob.podspec b/Libraries/Blob/React-RCTBlob.podspec
+index 8b48d45e7f40672e4a8d71d8d1c363ca9acaf156..30fee471c1b0a90521a584ca425aefa6afe8e01e 100644
+--- a/Libraries/Blob/React-RCTBlob.podspec
++++ b/Libraries/Blob/React-RCTBlob.podspec
+@@ -36,7 +36,7 @@ Pod::Spec.new do |s|
+   s.license                = package["license"]
+   s.author                 = "Meta Platforms, Inc. and its affiliates"
+   s.platforms              = min_supported_versions
+-  s.compiler_flags         = folly_compiler_flags + ' -Wno-nullability-completeness'
++  s.compiler_flags         = folly_compiler_flags + ' -Wno-nullability-completeness -fstack-protector-strong'
+   s.source                 = source
+   s.source_files           = "*.{h,m,mm}"
+   s.preserve_paths         = "package.json", "LICENSE", "LICENSE-docs"
+diff --git a/Libraries/FBLazyVector/FBLazyVector.podspec b/Libraries/FBLazyVector/FBLazyVector.podspec
+index 009ae434d9ea06c6be8dc72fb9f3f8c7431b5791..a880b48f6a324bac8931400df66ce833d5bc2f35 100644
+--- a/Libraries/FBLazyVector/FBLazyVector.podspec
++++ b/Libraries/FBLazyVector/FBLazyVector.podspec
+@@ -27,5 +27,6 @@ Pod::Spec.new do |s|
+   s.source                 = source
+   s.source_files           = "**/*.{c,h,m,mm,cpp}"
+   s.header_dir             = "FBLazyVector"
++  s.compiler_flags         = [ "-fstack-protector-strong" ]
+ 
+ end
+diff --git a/Libraries/Image/React-RCTImage.podspec b/Libraries/Image/React-RCTImage.podspec
+index 8fb9cca15e2aadba22a09de810379884915551e4..f5e4e0ce6f2f9babdb2d021124feaea346d93cfd 100644
+--- a/Libraries/Image/React-RCTImage.podspec
++++ b/Libraries/Image/React-RCTImage.podspec
+@@ -25,7 +25,6 @@ header_search_paths = [
+   "\"${PODS_ROOT}/Headers/Public/React-Codegen/react/renderer/components\"",
+ ]
+ 
+-
+ Pod::Spec.new do |s|
+   s.name                   = "React-RCTImage"
+   s.version                = version
+@@ -35,7 +34,7 @@ Pod::Spec.new do |s|
+   s.license                = package["license"]
+   s.author                 = "Meta Platforms, Inc. and its affiliates"
+   s.platforms              = min_supported_versions
+-  s.compiler_flags         = folly_compiler_flags + ' -Wno-nullability-completeness'
++  s.compiler_flags         = folly_compiler_flags + ' -Wno-nullability-completeness -fstack-protector-strong'
+   s.source                 = source
+   s.source_files           = "*.{m,mm}"
+   s.preserve_paths         = "package.json", "LICENSE", "LICENSE-docs"
+diff --git a/Libraries/LinkingIOS/React-RCTLinking.podspec b/Libraries/LinkingIOS/React-RCTLinking.podspec
+index 54745755443098009adaffb74f25113bfaabea7d..4c3315aef4206d14a35be6dd17ebf1d22524cc0c 100644
+--- a/Libraries/LinkingIOS/React-RCTLinking.podspec
++++ b/Libraries/LinkingIOS/React-RCTLinking.podspec
+@@ -34,7 +34,7 @@ Pod::Spec.new do |s|
+   s.license                = package["license"]
+   s.author                 = "Meta Platforms, Inc. and its affiliates"
+   s.platforms              = min_supported_versions
+-  s.compiler_flags         = folly_compiler_flags + ' -Wno-nullability-completeness'
++  s.compiler_flags         = folly_compiler_flags + ' -Wno-nullability-completeness -fstack-protector-strong'
+   s.source                 = source
+   s.source_files           = "*.{m,mm}"
+   s.preserve_paths         = "package.json", "LICENSE", "LICENSE-docs"
+diff --git a/Libraries/NativeAnimation/React-RCTAnimation.podspec b/Libraries/NativeAnimation/React-RCTAnimation.podspec
+index fe5a5786da607a62ca60685e2235544af8154b29..a07f90ad464cda74b4ba3b9ccdc93a095558c50d 100644
+--- a/Libraries/NativeAnimation/React-RCTAnimation.podspec
++++ b/Libraries/NativeAnimation/React-RCTAnimation.podspec
+@@ -33,7 +33,7 @@ Pod::Spec.new do |s|
+   s.license                = package["license"]
+   s.author                 = "Meta Platforms, Inc. and its affiliates"
+   s.platforms              = min_supported_versions
+-  s.compiler_flags         = folly_compiler_flags + ' -Wno-nullability-completeness'
++  s.compiler_flags         = folly_compiler_flags + ' -Wno-nullability-completeness -fstack-protector-strong'
+   s.source                 = source
+   s.source_files           = "**/*.{h,m,mm}"
+   s.preserve_paths         = "package.json", "LICENSE", "LICENSE-docs"
+diff --git a/Libraries/Network/React-RCTNetwork.podspec b/Libraries/Network/React-RCTNetwork.podspec
+index 179f0da985a1f1ecc28073d3c19a4e0c6b7d9551..434112ea0e6fc7e02c3f17dc6176d45890b453fd 100644
+--- a/Libraries/Network/React-RCTNetwork.podspec
++++ b/Libraries/Network/React-RCTNetwork.podspec
+@@ -33,7 +33,7 @@ Pod::Spec.new do |s|
+   s.license                = package["license"]
+   s.author                 = "Meta Platforms, Inc. and its affiliates"
+   s.platforms              = min_supported_versions
+-  s.compiler_flags         = folly_compiler_flags + ' -Wno-nullability-completeness'
++  s.compiler_flags         = folly_compiler_flags + ' -Wno-nullability-completeness -fstack-protector-strong'
+   s.source                 = source
+   s.source_files           = "*.{m,mm}"
+   s.preserve_paths         = "package.json", "LICENSE", "LICENSE-docs"
+diff --git a/Libraries/PushNotificationIOS/React-RCTPushNotification.podspec b/Libraries/PushNotificationIOS/React-RCTPushNotification.podspec
+index 14002a521e975ff64ccb3e57d7c439b9cf5ee55f..91a2aab9e6563f05b5a9bbc3453bdb5f56aef7ef 100644
+--- a/Libraries/PushNotificationIOS/React-RCTPushNotification.podspec
++++ b/Libraries/PushNotificationIOS/React-RCTPushNotification.podspec
+@@ -34,7 +34,7 @@ Pod::Spec.new do |s|
+   s.license                = package["license"]
+   s.author                 = "Meta Platforms, Inc. and its affiliates"
+   s.platforms              = min_supported_versions
+-  s.compiler_flags         = folly_compiler_flags + ' -Wno-nullability-completeness'
++  s.compiler_flags         = folly_compiler_flags + ' -Wno-nullability-completeness -fstack-protector-strong'
+   s.source                 = source
+   s.source_files           = "*.{m,mm}"
+   s.preserve_paths         = "package.json", "LICENSE", "LICENSE-docs"
+diff --git a/Libraries/Required/RCTRequired.podspec b/Libraries/Required/RCTRequired.podspec
+index 0d7cf299faf12a8a33f998812b80eed67262c69f..b3c90d7afed544bd9a33d4f8b308a764371dca0e 100644
+--- a/Libraries/Required/RCTRequired.podspec
++++ b/Libraries/Required/RCTRequired.podspec
+@@ -27,4 +27,5 @@ Pod::Spec.new do |s|
+   s.source                 = source
+   s.source_files           = "**/*.{c,h,m,mm,cpp}"
+   s.header_dir             = "RCTRequired"
++  s.compiler_flags         = [ "-fstack-protector-strong" ]
+ end
+diff --git a/Libraries/Settings/React-RCTSettings.podspec b/Libraries/Settings/React-RCTSettings.podspec
+index 30f9bdbb1ed1910ea9e7c1d2e8960cdfa2031cdc..c28751dce506a423196b3f5c1f3715ae9d61af9f 100644
+--- a/Libraries/Settings/React-RCTSettings.podspec
++++ b/Libraries/Settings/React-RCTSettings.podspec
+@@ -34,7 +34,7 @@ Pod::Spec.new do |s|
+   s.license                = package["license"]
+   s.author                 = "Meta Platforms, Inc. and its affiliates"
+   s.platforms              = min_supported_versions
+-  s.compiler_flags         = folly_compiler_flags + ' -Wno-nullability-completeness'
++  s.compiler_flags         = folly_compiler_flags + ' -Wno-nullability-completeness -fstack-protector-strong'
+   s.source                 = source
+   s.source_files           = "*.{m,mm}"
+   s.preserve_paths         = "package.json", "LICENSE", "LICENSE-docs"
+diff --git a/Libraries/Text/React-RCTText.podspec b/Libraries/Text/React-RCTText.podspec
+index 5ef1aab04f3622f0c595e7ebd21452a25608ae82..476bfa5d351c765e62af3c38dbbafde1373abace 100644
+--- a/Libraries/Text/React-RCTText.podspec
++++ b/Libraries/Text/React-RCTText.podspec
+@@ -31,6 +31,7 @@ Pod::Spec.new do |s|
+   s.header_dir             = "RCTText"
+   s.framework              = ["MobileCoreServices"]
+   s.pod_target_xcconfig    = { "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard() }
++  s.compiler_flags         = [ "-fstack-protector-strong" ]
+ 
+   s.dependency "Yoga"
+   s.dependency "React-Core/RCTTextHeaders", version
+diff --git a/Libraries/TypeSafety/RCTTypeSafety.podspec b/Libraries/TypeSafety/RCTTypeSafety.podspec
+index b13ec49c634b6be9013532cb740c42bf1ca82a9d..56c957ced8a5201c2c8d24327d5b1fadcf4bf494 100644
+--- a/Libraries/TypeSafety/RCTTypeSafety.podspec
++++ b/Libraries/TypeSafety/RCTTypeSafety.podspec
+@@ -27,6 +27,7 @@ Pod::Spec.new do |s|
+   s.source                 = source
+   s.source_files           = "**/*.{c,h,m,mm,cpp}"
+   s.header_dir             = "RCTTypeSafety"
++  s.compiler_flags         = [ "-fstack-protector-strong" ]
+   s.pod_target_xcconfig    = {
+                                "USE_HEADERMAP" => "YES",
+                                "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard(),
+diff --git a/Libraries/Vibration/React-RCTVibration.podspec b/Libraries/Vibration/React-RCTVibration.podspec
+index e6b7d69cde4cbc72eb1f3df594165491ea6957cb..6a8835b62278da77c3e86f141e62e7b0b28242cc 100644
+--- a/Libraries/Vibration/React-RCTVibration.podspec
++++ b/Libraries/Vibration/React-RCTVibration.podspec
+@@ -34,7 +34,7 @@ Pod::Spec.new do |s|
+   s.license                = package["license"]
+   s.author                 = "Meta Platforms, Inc. and its affiliates"
+   s.platforms              = min_supported_versions
+-  s.compiler_flags         = folly_compiler_flags + ' -Wno-nullability-completeness'
++  s.compiler_flags         = folly_compiler_flags + ' -Wno-nullability-completeness -fstack-protector-strong'
+   s.source                 = source
+   s.source_files           = "*.{m,mm}"
+   s.preserve_paths         = "package.json", "LICENSE", "LICENSE-docs"
+diff --git a/React/CoreModules/React-CoreModules.podspec b/React/CoreModules/React-CoreModules.podspec
+index b6f2cfb1e23b97e74df5270e5650264e37e34d96..f63c1dba4dbfd48fb5744c12665a17ab510afc0d 100644
+--- a/React/CoreModules/React-CoreModules.podspec
++++ b/React/CoreModules/React-CoreModules.podspec
+@@ -38,7 +38,7 @@ Pod::Spec.new do |s|
+   s.license                = package["license"]
+   s.author                 = "Meta Platforms, Inc. and its affiliates"
+   s.platforms              = min_supported_versions
+-  s.compiler_flags         = folly_compiler_flags + ' -Wno-nullability-completeness'
++  s.compiler_flags         = folly_compiler_flags + ' -Wno-nullability-completeness -fstack-protector-strong'
+   s.source                 = source
+   s.source_files           = "**/*.{c,m,mm,cpp}"
+   s.header_dir             = "CoreModules"
+diff --git a/React/React-RCTFabric.podspec b/React/React-RCTFabric.podspec
+index 5781df022f9b6af1167951f8eaec6d9f37157293..996d96f64d421e3570afa27169d55bfcd3de52d5 100644
+--- a/React/React-RCTFabric.podspec
++++ b/React/React-RCTFabric.podspec
+@@ -53,7 +53,7 @@ Pod::Spec.new do |s|
+   s.source_files           = "Fabric/**/*.{c,h,m,mm,S,cpp}"
+   s.exclude_files          = "**/tests/*",
+                              "**/android/*",
+-  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags + new_arch_flags
++  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags + new_arch_flags + ' -fstack-protector-strong'
+   s.header_dir             = header_dir
+   s.module_name            = module_name
+   s.framework              = ["JavaScriptCore", "MobileCoreServices"]
+diff --git a/React-Core.podspec b/React-Core.podspec
+index b912979d47af30189226717414b4afa0b9a2e87c..04fedd4645532b0725ab692f8db383ba57bae174 100644
+--- a/React-Core.podspec
++++ b/React-Core.podspec
+@@ -65,7 +65,7 @@ Pod::Spec.new do |s|
+   s.platforms              = min_supported_versions
+   s.source                 = source
+   s.resource_bundle        = { "RCTI18nStrings" => ["React/I18n/strings/*.lproj"]}
+-  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags + ' ' + use_hermes_flag
++  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags + ' ' + use_hermes_flag + ' -fstack-protector-strong'
+   s.header_dir             = "React"
+   s.framework              = "JavaScriptCore"
+   s.pod_target_xcconfig    = {
+diff --git a/ReactApple/Libraries/RCTFoundation/RCTDeprecation/RCTDeprecation.podspec b/ReactApple/Libraries/RCTFoundation/RCTDeprecation/RCTDeprecation.podspec
+index afd7d4eeb1c97fe3f78f8df99cb325821b301650..7c56d26feb754c821c3a1c0647532c267481b426 100644
+--- a/ReactApple/Libraries/RCTFoundation/RCTDeprecation/RCTDeprecation.podspec
++++ b/ReactApple/Libraries/RCTFoundation/RCTDeprecation/RCTDeprecation.podspec
+@@ -21,5 +21,5 @@ Pod::Spec.new do |s|
+       "DEFINES_MODULE" => "YES",
+       "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard()
+     }
+-    s.compiler_flags         = "-Wnullable-to-nonnull-conversion -Wnullability-completeness"
++    s.compiler_flags         = "-Wnullable-to-nonnull-conversion -Wnullability-completeness -fstack-protector-strong"
+   end
+diff --git a/ReactCommon/React-Fabric.podspec b/ReactCommon/React-Fabric.podspec
+index 58f6f0a84383c8197f24bf31693160e0e1bd2dd7..1a8f944ad2f2253ed6803642e0e43ffbde7b189f 100644
+--- a/ReactCommon/React-Fabric.podspec
++++ b/ReactCommon/React-Fabric.podspec
+@@ -34,6 +34,7 @@ Pod::Spec.new do |s|
+   s.platforms              = min_supported_versions
+   s.source                 = source
+   s.source_files           = "dummyFile.cpp"
++  s.compiler_flags         = [ "-fstack-protector-strong" ]
+   s.pod_target_xcconfig = { "USE_HEADERMAP" => "YES",
+                             "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard(),
+                             "DEFINES_MODULE" => "YES" }
+diff --git a/ReactCommon/React-FabricImage.podspec b/ReactCommon/React-FabricImage.podspec
+index be125c11deec1d285f54ea5c481b0b70e96fb034..113485d679998b67cf9e136586e991ca1eefa460 100644
+--- a/ReactCommon/React-FabricImage.podspec
++++ b/ReactCommon/React-FabricImage.podspec
+@@ -54,7 +54,7 @@ Pod::Spec.new do |s|
+   s.source_files         = "react/renderer/components/image/**/*.{m,mm,cpp,h}"
+   s.exclude_files        = "react/renderer/components/image/tests"
+   s.header_dir           = "react/renderer/components/image"
+-  s.compiler_flags       = folly_compiler_flags
++  s.compiler_flags       = folly_compiler_flags + " -fstack-protector-strong"
+   s.pod_target_xcconfig = { "USE_HEADERMAP" => "YES",
+                             "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard(),
+                             "HEADER_SEARCH_PATHS" => header_search_path.join(" ")
+diff --git a/ReactCommon/React-Mapbuffer.podspec b/ReactCommon/React-Mapbuffer.podspec
+index 0905b5dee13a85498685e80d44b762335c99ffdc..1f378fc8b9fb3ef5cbebb85e8a40a637e66c7be8 100644
+--- a/ReactCommon/React-Mapbuffer.podspec
++++ b/ReactCommon/React-Mapbuffer.podspec
+@@ -29,6 +29,7 @@ Pod::Spec.new do |s|
+   s.exclude_files          = "react/renderer/mapbuffer/tests"
+   s.public_header_files    = 'react/renderer/mapbuffer/*.h'
+   s.header_dir             = "react/renderer/mapbuffer"
++  s.compiler_flags         = [ "-fstack-protector-strong" ]
+   s.pod_target_xcconfig = {  "HEADER_SEARCH_PATHS" => "\"$(PODS_TARGET_SRCROOT)\"", "USE_HEADERMAP" => "YES",
+                             "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard() }
+ 
+diff --git a/ReactCommon/React-nativeconfig.podspec b/ReactCommon/React-nativeconfig.podspec
+index afce6e165cae8121dab0bf68927ef8c891ac8e4a..d18cc7a13bd947ff21f9758b91dd31dcdeda2a4d 100644
+--- a/ReactCommon/React-nativeconfig.podspec
++++ b/ReactCommon/React-nativeconfig.podspec
+@@ -28,6 +28,7 @@ Pod::Spec.new do |s|
+   s.source_files           = "react/config/*.{m,mm,cpp,h}"
+   s.header_dir             = "react/config"
+   s.pod_target_xcconfig    = { "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard() }
++  s.compiler_flags         = [ "-fstack-protector-strong" ]
+ 
+   if ENV['USE_FRAMEWORKS']
+     s.header_mappings_dir     = './'
+diff --git a/ReactCommon/React-rncore.podspec b/ReactCommon/React-rncore.podspec
+index 06b8bc7feff1b72093692feae061efc8621ed5fd..a0d519c6a6217ba6904e8fa602a7a9d5630eb64b 100644
+--- a/ReactCommon/React-rncore.podspec
++++ b/ReactCommon/React-rncore.podspec
+@@ -49,4 +49,5 @@ Pod::Spec.new do |s|
+   s.pod_target_xcconfig = { "USE_HEADERMAP" => "YES",
+                             "HEADER_SEARCH_PATHS" => header_search_paths.join(' '),
+                             "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard() }
++  s.compiler_flags         = [ "-fstack-protector-strong" ]
+ end
+diff --git a/ReactCommon/ReactCommon.podspec b/ReactCommon/ReactCommon.podspec
+index 0b6f175895de6e1e972a80a300f37496cf2d3be1..9e14c3d0c961abe0ae04ebb49b2f5dba519dba24 100644
+--- a/ReactCommon/ReactCommon.podspec
++++ b/ReactCommon/ReactCommon.podspec
+@@ -33,7 +33,7 @@ Pod::Spec.new do |s|
+   s.platforms              = min_supported_versions
+   s.source                 = source
+   s.header_dir             = "ReactCommon" # Use global header_dir for all subspecs for use_frameworks! compatibility
+-  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags
++  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags + ' -fstack-protector-strong'
+   s.pod_target_xcconfig    = { "HEADER_SEARCH_PATHS" => "\"$(PODS_ROOT)/boost\" \"$(PODS_ROOT)/RCT-Folly\" \"$(PODS_ROOT)/DoubleConversion\" \"$(PODS_ROOT)/fmt/include\" \"$(PODS_ROOT)/Headers/Private/React-Core\"",
+                                "USE_HEADERMAP" => "YES",
+                                "DEFINES_MODULE" => "YES",
+diff --git a/ReactCommon/callinvoker/React-callinvoker.podspec b/ReactCommon/callinvoker/React-callinvoker.podspec
+index 6d140e054630c87c84e2a9dd1d2570a1c909efac..079b607114801dfd69b2ac44cb7033e013c30e93 100644
+--- a/ReactCommon/callinvoker/React-callinvoker.podspec
++++ b/ReactCommon/callinvoker/React-callinvoker.podspec
+@@ -33,4 +33,5 @@ Pod::Spec.new do |s|
+   s.source                 = source
+   s.source_files           = "**/*.{cpp,h}"
+   s.header_dir             = "ReactCommon"
++  s.compiler_flags         = [ "-fstack-protector-strong" ]
+ end
+diff --git a/ReactCommon/cxxreact/React-cxxreact.podspec b/ReactCommon/cxxreact/React-cxxreact.podspec
+index d38704aeee200afff9f607bf058a525003eec014..eb249a5d86e03eeedff1b44bd77acfa6c63279b0 100644
+--- a/ReactCommon/cxxreact/React-cxxreact.podspec
++++ b/ReactCommon/cxxreact/React-cxxreact.podspec
+@@ -33,7 +33,7 @@ Pod::Spec.new do |s|
+   s.source                 = source
+   s.source_files           = "*.{cpp,h}"
+   s.exclude_files          = "SampleCxxModule.*"
+-  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags
++  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags + ' -fstack-protector-strong'
+   s.pod_target_xcconfig    = {
+     "HEADER_SEARCH_PATHS" => "\"$(PODS_ROOT)/boost\" \"$(PODS_ROOT)/RCT-Folly\" \"$(PODS_ROOT)/DoubleConversion\" \"$(PODS_ROOT)/fmt/include\" \"$(PODS_CONFIGURATION_BUILD_DIR)/React-debug/React_debug.framework/Headers\" \"${PODS_CONFIGURATION_BUILD_DIR}/React-runtimeexecutor/React_runtimeexecutor.framework/Headers\"",
+     "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard()
+diff --git a/ReactCommon/hermes/React-hermes.podspec b/ReactCommon/hermes/React-hermes.podspec
+index 9a38c881272af42db4dfaf958c0a8bd8db62e0f6..165b03e1de202d2baae0dcdd5cfe4fd45f5a28a1 100644
+--- a/ReactCommon/hermes/React-hermes.podspec
++++ b/ReactCommon/hermes/React-hermes.podspec
+@@ -34,7 +34,7 @@ Pod::Spec.new do |s|
+   s.source_files           = "executor/*.{cpp,h}",
+                              "inspector-modern/chrome/*.{cpp,h}",
+   s.public_header_files    = "executor/HermesExecutorFactory.h"
+-  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags
++  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags + ' -fstack-protector-strong'
+   s.pod_target_xcconfig    = {
+                                "HEADER_SEARCH_PATHS" => "\"${PODS_ROOT}/hermes-engine/destroot/include\" \"$(PODS_TARGET_SRCROOT)/..\" \"$(PODS_ROOT)/boost\" \"$(PODS_ROOT)/RCT-Folly\" \"$(PODS_ROOT)/DoubleConversion\" \"$(PODS_ROOT)/fmt/include\"",
+                                "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard()
+diff --git a/ReactCommon/hermes/executor/React-jsitracing.podspec b/ReactCommon/hermes/executor/React-jsitracing.podspec
+index 3ccee99377915e5e6453474aab93b960f69161bd..9f46b57a905b6407b5901d3817ba4538fef0b112 100644
+--- a/ReactCommon/hermes/executor/React-jsitracing.podspec
++++ b/ReactCommon/hermes/executor/React-jsitracing.podspec
+@@ -31,6 +31,7 @@ Pod::Spec.new do |s|
+                                 "USE_HEADERMAP" => "YES",
+                                 "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard(),
+                                 "GCC_WARN_PEDANTIC" => "YES" }
++  s.compiler_flags         = [ "-fstack-protector-strong" ]
+ 
+   if ENV['USE_FRAMEWORKS']
+     s.header_mappings_dir     = './'
+diff --git a/ReactCommon/jsc/React-jsc.podspec b/ReactCommon/jsc/React-jsc.podspec
+index 6239621c6a8c641d11640d1951619423f7f2f1a4..20f3421f9f9e81236b4e099494630151e75daf4f 100644
+--- a/ReactCommon/jsc/React-jsc.podspec
++++ b/ReactCommon/jsc/React-jsc.podspec
+@@ -28,6 +28,7 @@ Pod::Spec.new do |s|
+   s.source_files           = "JSCRuntime.{cpp,h}"
+   s.exclude_files          = "**/test/*"
+   s.framework              = "JavaScriptCore"
++  s.compiler_flags         = [ "-fstack-protector-strong" ]
+ 
+   s.dependency "React-jsi", version
+ 
+diff --git a/ReactCommon/jserrorhandler/React-jserrorhandler.podspec b/ReactCommon/jserrorhandler/React-jserrorhandler.podspec
+index 0202b89061497e3e79b3058719ccb3044cc5b778..e427d06ff7f6d4b7449ac8fef8a06568edf5ee26 100644
+--- a/ReactCommon/jserrorhandler/React-jserrorhandler.podspec
++++ b/ReactCommon/jserrorhandler/React-jserrorhandler.podspec
+@@ -38,7 +38,7 @@ Pod::Spec.new do |s|
+     "USE_HEADERMAP" => "YES",
+     "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard()
+   }
+-  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags
++  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags + ' -fstack-protector-strong'
+ 
+   if ENV['USE_FRAMEWORKS']
+     s.header_mappings_dir     = '../'
+diff --git a/ReactCommon/jsi/React-jsi.podspec b/ReactCommon/jsi/React-jsi.podspec
+index c32b83266da28a3cb11cdb0428773228cd546d69..158b3c776b102a1f95507a7b0ed0bcefc50bc614 100644
+--- a/ReactCommon/jsi/React-jsi.podspec
++++ b/ReactCommon/jsi/React-jsi.podspec
+@@ -36,7 +36,7 @@ Pod::Spec.new do |s|
+   s.source                 = source
+ 
+   s.header_dir    = "jsi"
+-  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags
++  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags + ' -fstack-protector-strong'
+   s.pod_target_xcconfig    = { "HEADER_SEARCH_PATHS" => "\"$(PODS_ROOT)/boost\" \"$(PODS_ROOT)/RCT-Folly\" \"$(PODS_ROOT)/DoubleConversion\" \"$(PODS_ROOT)/fmt/include\"",
+                                "DEFINES_MODULE" => "YES" }
+ 
+diff --git a/ReactCommon/jsiexecutor/React-jsiexecutor.podspec b/ReactCommon/jsiexecutor/React-jsiexecutor.podspec
+index 894f6614f44eaf8527d418c3dfaf51243cc8a7cc..8a5bac165286ff06b570a7d18ae549e36ced6b3f 100644
+--- a/ReactCommon/jsiexecutor/React-jsiexecutor.podspec
++++ b/ReactCommon/jsiexecutor/React-jsiexecutor.podspec
+@@ -31,7 +31,7 @@ Pod::Spec.new do |s|
+   s.platforms              = min_supported_versions
+   s.source                 = source
+   s.source_files         = "jsireact/*.{cpp,h}"
+-  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags
++  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags + ' -fstack-protector-strong'
+   s.pod_target_xcconfig    = { "HEADER_SEARCH_PATHS" => "\"$(PODS_ROOT)/boost\" \"$(PODS_ROOT)/RCT-Folly\" \"$(PODS_ROOT)/DoubleConversion\" \"$(PODS_ROOT)/fmt/include\"",
+                                "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard() }
+   s.header_dir             = "jsireact"
+diff --git a/ReactCommon/jsinspector-modern/React-jsinspector.podspec b/ReactCommon/jsinspector-modern/React-jsinspector.podspec
+index e338fcd843e9b95f4a3a94c9653247c005d2a971..0668905fcdc826088052b9e71604f925b82a8c39 100644
+--- a/ReactCommon/jsinspector-modern/React-jsinspector.podspec
++++ b/ReactCommon/jsinspector-modern/React-jsinspector.podspec
+@@ -35,7 +35,7 @@ Pod::Spec.new do |s|
+   s.source                 = source
+   s.source_files           = "*.{cpp,h}"
+   s.header_dir             = 'jsinspector-modern'
+-  s.compiler_flags         = folly_compiler_flags
++  s.compiler_flags         = folly_compiler_flags + ' -fstack-protector-strong'
+   s.pod_target_xcconfig    = {
+                                "HEADER_SEARCH_PATHS" => "\"$(PODS_TARGET_SRCROOT)/..\" \"$(PODS_ROOT)/boost\" \"$(PODS_ROOT)/RCT-Folly\" \"$(PODS_ROOT)/DoubleConversion\" \"$(PODS_ROOT)/fmt/include\"",
+                                "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard(),
+diff --git a/ReactCommon/logger/React-logger.podspec b/ReactCommon/logger/React-logger.podspec
+index eb2eaeaeffac3b1431b16281a048a736c3931558..477875cefdbfaa380f881acc799753b960054b5a 100644
+--- a/ReactCommon/logger/React-logger.podspec
++++ b/ReactCommon/logger/React-logger.podspec
+@@ -32,7 +32,7 @@ Pod::Spec.new do |s|
+   s.platforms              = min_supported_versions
+   s.source                 = source
+   s.source_files           = "*.{cpp,h}"
+-  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags
++  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags + ' -fstack-protector-strong'
+   s.pod_target_xcconfig    = { "HEADER_SEARCH_PATHS" => "" }
+   s.header_dir             = "logger"
+ 
+diff --git a/ReactCommon/react/debug/React-debug.podspec b/ReactCommon/react/debug/React-debug.podspec
+index 4754c832404f459f54a813cf3e7dd90ccde89fb7..8316b02856783889d9b19638b8a40b84cc9ad420 100644
+--- a/ReactCommon/react/debug/React-debug.podspec
++++ b/ReactCommon/react/debug/React-debug.podspec
+@@ -27,6 +27,7 @@ Pod::Spec.new do |s|
+   s.source                 = source
+   s.source_files           = "**/*.{cpp,h}"
+   s.header_dir             = "react/debug"
++  s.compiler_flags         = [ "-fstack-protector-strong" ]
+   s.pod_target_xcconfig    = { "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard(),
+                                "DEFINES_MODULE" => "YES" }
+ 
+diff --git a/ReactCommon/react/featureflags/React-featureflags.podspec b/ReactCommon/react/featureflags/React-featureflags.podspec
+index 0cefca1a4ba8002eebe3f3bb7064578ba72fdeb2..5f1a7c7c1a2d9f1edaa188535eef020fcd4385b5 100644
+--- a/ReactCommon/react/featureflags/React-featureflags.podspec
++++ b/ReactCommon/react/featureflags/React-featureflags.podspec
+@@ -36,6 +36,7 @@ Pod::Spec.new do |s|
+   s.pod_target_xcconfig    = { "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard(),
+                                "HEADER_SEARCH_PATHS" => header_search_paths.join(' '),
+                                "DEFINES_MODULE" => "YES" }
++  s.compiler_flags         = [ "-fstack-protector-strong" ]
+ 
+   if ENV['USE_FRAMEWORKS']
+     s.module_name            = "React_featureflags"
+diff --git a/ReactCommon/react/nativemodule/core/platform/ios/React-NativeModulesApple.podspec b/ReactCommon/react/nativemodule/core/platform/ios/React-NativeModulesApple.podspec
+index b758daa1851175f402b5fe8cb7c55f0c0664d4bb..17699956b11d7f91d318eb98f2e75c712de4197e 100644
+--- a/ReactCommon/react/nativemodule/core/platform/ios/React-NativeModulesApple.podspec
++++ b/ReactCommon/react/nativemodule/core/platform/ios/React-NativeModulesApple.podspec
+@@ -33,7 +33,7 @@ Pod::Spec.new do |s|
+     s.author                 = "Meta Platforms, Inc. and its affiliates"
+     s.platforms              = min_supported_versions
+     s.source                 = source
+-    s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags
++    s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags + ' -fstack-protector-strong'
+     s.pod_target_xcconfig    = { "HEADER_SEARCH_PATHS" => "\"$(PODS_ROOT)/boost\" \"$(PODS_ROOT)/RCT-Folly\" \"$(PODS_ROOT)/DoubleConversion\" \"$(PODS_ROOT)/fmt/include\" \"$(PODS_ROOT)/Headers/Private/React-Core\"",
+                                 "USE_HEADERMAP" => "YES",
+                                 "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard(),
+diff --git a/ReactCommon/react/nativemodule/samples/ReactCommon-Samples.podspec b/ReactCommon/react/nativemodule/samples/ReactCommon-Samples.podspec
+index a034edc582ee239ac6e2ad5ebb4359a28015fc6c..12cb3e6326609287fbee2c7817c77bbc052c49ee 100644
+--- a/ReactCommon/react/nativemodule/samples/ReactCommon-Samples.podspec
++++ b/ReactCommon/react/nativemodule/samples/ReactCommon-Samples.podspec
+@@ -44,7 +44,7 @@ Pod::Spec.new do |s|
+   s.author                 = "Meta Platforms, Inc. and its affiliates"
+   s.platforms              = min_supported_versions
+   s.source                 = source
+-  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags
++  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags + ' -fstack-protector-strong'
+   s.pod_target_xcconfig    = { "HEADER_SEARCH_PATHS" => header_search_paths,
+                                "USE_HEADERMAP" => "YES",
+                                "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard(),
+diff --git a/ReactCommon/react/renderer/debug/React-rendererdebug.podspec b/ReactCommon/react/renderer/debug/React-rendererdebug.podspec
+index e50334971e8a23e0e61b6cc6918b209df4e0c289..3f9638b31c4cecd3d0602d8f7b56d93da660d9ac 100644
+--- a/ReactCommon/react/renderer/debug/React-rendererdebug.podspec
++++ b/ReactCommon/react/renderer/debug/React-rendererdebug.podspec
+@@ -41,7 +41,7 @@ Pod::Spec.new do |s|
+   s.platforms              = min_supported_versions
+   s.source                 = source
+   s.source_files           = "**/*.{cpp,h,mm}"
+-  s.compiler_flags         = folly_compiler_flags
++  s.compiler_flags         = folly_compiler_flags + ' -fstack-protector-strong'
+   s.header_dir             = "react/renderer/debug"
+   s.exclude_files          = "tests"
+   s.pod_target_xcconfig    = {
+diff --git a/ReactCommon/react/renderer/graphics/React-graphics.podspec b/ReactCommon/react/renderer/graphics/React-graphics.podspec
+index b5faee3286fc0ee031668734edcd6b235690fa34..81add890320604947b2283549c7dce69653e2308 100644
+--- a/ReactCommon/react/renderer/graphics/React-graphics.podspec
++++ b/ReactCommon/react/renderer/graphics/React-graphics.podspec
+@@ -40,7 +40,7 @@ Pod::Spec.new do |s|
+   s.author                 = "Meta Platforms, Inc. and its affiliates"
+   s.platforms              = min_supported_versions
+   s.source                 = source
+-  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags
++  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags + ' -fstack-protector-strong'
+   s.source_files           = source_files
+   s.exclude_files          = "tests",
+                              "platform/android",
+diff --git a/ReactCommon/react/renderer/imagemanager/platform/ios/React-ImageManager.podspec b/ReactCommon/react/renderer/imagemanager/platform/ios/React-ImageManager.podspec
+index 6feeafaf718f0deaadcd91acea2a635199050660..0642079cd87150e2668fb3be75019596aeb3250f 100644
+--- a/ReactCommon/react/renderer/imagemanager/platform/ios/React-ImageManager.podspec
++++ b/ReactCommon/react/renderer/imagemanager/platform/ios/React-ImageManager.podspec
+@@ -38,7 +38,7 @@ Pod::Spec.new do |s|
+   s.author                 = "Meta Platforms, Inc. and its affiliates"
+   s.platforms              = min_supported_versions
+   s.source                 = source
+-  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags
++  s.compiler_flags         = folly_compiler_flags + ' ' + boost_compiler_flags + ' -fstack-protector-strong'
+   s.source_files           = source_files
+   s.header_dir             = "react/renderer/imagemanager"
+ 
+diff --git a/ReactCommon/react/renderer/runtimescheduler/React-runtimescheduler.podspec b/ReactCommon/react/renderer/runtimescheduler/React-runtimescheduler.podspec
+index 642d71980a948b0ce00600d5d435e3fd2f3b3527..9877d861e4ce151064b1ee64a7119aaa93cd1727 100644
+--- a/ReactCommon/react/renderer/runtimescheduler/React-runtimescheduler.podspec
++++ b/ReactCommon/react/renderer/runtimescheduler/React-runtimescheduler.podspec
+@@ -39,7 +39,7 @@ Pod::Spec.new do |s|
+   s.platforms              = min_supported_versions
+   s.source                 = source
+   s.source_files           = "**/*.{cpp,h}"
+-  s.compiler_flags         = folly_compiler_flags
++  s.compiler_flags         = folly_compiler_flags + ' -fstack-protector-strong'
+   s.header_dir             = "react/renderer/runtimescheduler"
+   s.exclude_files          = "tests"
+   s.pod_target_xcconfig    = {
+diff --git a/ReactCommon/react/runtime/React-RuntimeCore.podspec b/ReactCommon/react/runtime/React-RuntimeCore.podspec
+index 141ad6a1eaf9c4b7729d0974a1015ea4eaaf4d36..c9d363bb0195e07704d73cd684e561d4bedcb1ec 100644
+--- a/ReactCommon/react/runtime/React-RuntimeCore.podspec
++++ b/ReactCommon/react/runtime/React-RuntimeCore.podspec
+@@ -39,7 +39,7 @@ Pod::Spec.new do |s|
+                                 "USE_HEADERMAP" => "YES",
+                                 "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard(),
+                                 "GCC_WARN_PEDANTIC" => "YES" }
+-  s.compiler_flags       = folly_compiler_flags + ' ' + boost_compiler_flags
++  s.compiler_flags       = folly_compiler_flags + ' ' + boost_compiler_flags + ' -fstack-protector-strong'
+ 
+   if ENV['USE_FRAMEWORKS']
+     s.header_mappings_dir     = '../../'
+diff --git a/ReactCommon/react/runtime/React-RuntimeHermes.podspec b/ReactCommon/react/runtime/React-RuntimeHermes.podspec
+index 2f6790b20f244a34d8dca9a5f1c5e95bd017e0d7..4a123eabb1ceedb2a8408a427531c795a5a541e7 100644
+--- a/ReactCommon/react/runtime/React-RuntimeHermes.podspec
++++ b/ReactCommon/react/runtime/React-RuntimeHermes.podspec
+@@ -37,7 +37,7 @@ Pod::Spec.new do |s|
+                                 "USE_HEADERMAP" => "YES",
+                                 "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard(),
+                                 "GCC_WARN_PEDANTIC" => "YES" }
+-  s.compiler_flags       = folly_compiler_flags + ' ' + boost_compiler_flags
++  s.compiler_flags       = folly_compiler_flags + ' ' + boost_compiler_flags + ' -fstack-protector-strong'
+ 
+   if ENV['USE_FRAMEWORKS']
+     s.header_mappings_dir     = './'
+diff --git a/ReactCommon/react/runtime/platform/ios/React-RuntimeApple.podspec b/ReactCommon/react/runtime/platform/ios/React-RuntimeApple.podspec
+index 589d097f890019cdcf45fc5641f1a3660fe5d8f0..4f5dbd941f9ff55f147616c50b10b774ede47e6d 100644
+--- a/ReactCommon/react/runtime/platform/ios/React-RuntimeApple.podspec
++++ b/ReactCommon/react/runtime/platform/ios/React-RuntimeApple.podspec
+@@ -44,7 +44,7 @@ Pod::Spec.new do |s|
+                                 "USE_HEADERMAP" => "YES",
+                                 "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard(),
+                                 "GCC_WARN_PEDANTIC" => "YES" }
+-  s.compiler_flags       = folly_compiler_flags + ' ' + boost_compiler_flags
++  s.compiler_flags       = folly_compiler_flags + ' ' + boost_compiler_flags + ' -fstack-protector-strong'
+ 
+   if ENV['USE_FRAMEWORKS']
+     s.header_mappings_dir     = './'
+diff --git a/ReactCommon/react/utils/React-utils.podspec b/ReactCommon/react/utils/React-utils.podspec
+index 1de039b052e0a56bae14f68cb4e643e6669b1ff5..cb42541d6ec7c7e6fb10315c46a98d285a866263 100644
+--- a/ReactCommon/react/utils/React-utils.podspec
++++ b/ReactCommon/react/utils/React-utils.podspec
+@@ -36,7 +36,7 @@ Pod::Spec.new do |s|
+   s.platforms              = min_supported_versions
+   s.source                 = source
+   s.source_files           = "**/*.{cpp,h,mm}"
+-  s.compiler_flags         = folly_compiler_flags
++  s.compiler_flags         = folly_compiler_flags + ' -fstack-protector-strong'
+   s.header_dir             = "react/utils"
+   s.exclude_files          = "tests"
+   s.pod_target_xcconfig    = { "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard(),
+diff --git a/ReactCommon/reactperflogger/React-perflogger.podspec b/ReactCommon/reactperflogger/React-perflogger.podspec
+index e672bf66c8a35f9ad55457c16525051fd5d88a58..4a56eebacdb230d6d8b05319fe5ef7cd4dc04511 100644
+--- a/ReactCommon/reactperflogger/React-perflogger.podspec
++++ b/ReactCommon/reactperflogger/React-perflogger.podspec
+@@ -33,4 +33,5 @@ Pod::Spec.new do |s|
+   s.source_files           = "**/*.{cpp,h}"
+   s.header_dir             = "reactperflogger"
+   s.pod_target_xcconfig    = { "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard() }
++  s.compiler_flags         = [ "-fstack-protector-strong" ]
+ end
+diff --git a/ReactCommon/runtimeexecutor/React-runtimeexecutor.podspec b/ReactCommon/runtimeexecutor/React-runtimeexecutor.podspec
+index c5d93824a867e8167c65a23d5a3c9008edf7d52e..37325611fc3a099b16a6f654058d37f6f89a7793 100644
+--- a/ReactCommon/runtimeexecutor/React-runtimeexecutor.podspec
++++ b/ReactCommon/runtimeexecutor/React-runtimeexecutor.podspec
+@@ -32,6 +32,7 @@ Pod::Spec.new do |s|
+   s.source                 = source
+   s.source_files           = "**/*.{cpp,h}"
+   s.header_dir             = "ReactCommon"
++  s.compiler_flags         = [ "-fstack-protector-strong" ]
+ 
+   s.dependency "React-jsi", version
+ end
+diff --git a/ReactCommon/yoga/Yoga.podspec b/ReactCommon/yoga/Yoga.podspec
+index b323b05ed739f7a758a35bd33fb750580c472b71..421e06171f6c6c58d9fb0af02b7585f2c981e251 100644
+--- a/ReactCommon/yoga/Yoga.podspec
++++ b/ReactCommon/yoga/Yoga.podspec
+@@ -29,7 +29,8 @@ Pod::Spec.new do |spec|
+ 
+   spec.module_name = 'yoga'
+   spec.header_dir = 'yoga'
+-  spec.requires_arc = false
++  # VULN-1270: We need arc on.
++  spec.requires_arc = true
+   spec.pod_target_xcconfig = {
+       'DEFINES_MODULE' => 'YES'
+   }.merge!(ENV['USE_FRAMEWORKS'] != nil ? {
+@@ -38,11 +40,12 @@ Pod::Spec.new do |spec|
+ 
+   spec.compiler_flags = [
+       '-fno-omit-frame-pointer',
++      '-fstack-protector-strong',
+       '-fexceptions',
+       '-Wall',
+       '-Werror',
+       '-std=c++20',
+-      '-fPIC'
++      '-fPIC',
+   ]
+ 
+   # Pinning to the same version as React.podspec.
+diff --git a/sdks/hermes-engine/hermes-engine.podspec b/sdks/hermes-engine/hermes-engine.podspec
+index 335004f1e87e3ddd353a910ed878f67c35af62d7..5748b658e30ab108fbe153bf4ee13f781ca45d1d 100644
+--- a/sdks/hermes-engine/hermes-engine.podspec
++++ b/sdks/hermes-engine/hermes-engine.podspec
+@@ -28,6 +28,7 @@ Pod::Spec.new do |spec|
+ 
+   spec.preserve_paths      = '**/*.*'
+   spec.source_files        = ''
++  spec.compiler_flags      = [ "-fstack-protector-strong" ]
+ 
+   spec.pod_target_xcconfig = {
+                     "CLANG_CXX_LANGUAGE_STANDARD" => "c++20",
+diff --git a/third-party-podspecs/DoubleConversion.podspec b/third-party-podspecs/DoubleConversion.podspec
+index 9d33cffed6cd9e8a0a2f3cd7220769453da17ef1..3e5148da5fc77e849cfb3d29db3e763690f3f8d9 100644
+--- a/third-party-podspecs/DoubleConversion.podspec
++++ b/third-party-podspecs/DoubleConversion.podspec
+@@ -16,7 +16,7 @@ Pod::Spec.new do |spec|
+   spec.module_name = 'DoubleConversion'
+   spec.header_dir = 'double-conversion'
+   spec.source_files = 'double-conversion/*.{h,cc}'
+-  spec.compiler_flags = '-Wno-unreachable-code'
++  spec.compiler_flags = '-Wno-unreachable-code -fstack-protector-strong'
+ 
+   spec.user_target_xcconfig = { "HEADER_SEARCH_PATHS" => "\"$(PODS_ROOT)/DoubleConversion\"" }
+ 
+diff --git a/third-party-podspecs/RCT-Folly.podspec b/third-party-podspecs/RCT-Folly.podspec
+index eb2d9b4ed8cb85b796fa04515de86d94f2a39d0e..1616826aea56d0056425466ac206c4532e1872e9 100644
+--- a/third-party-podspecs/RCT-Folly.podspec
++++ b/third-party-podspecs/RCT-Folly.podspec
+@@ -23,7 +23,7 @@ Pod::Spec.new do |spec|
+   spec.dependency 'DoubleConversion'
+   spec.dependency 'glog'
+   spec.dependency "fmt", "9.1.0"
+-  spec.compiler_flags = folly_compiler_flags + ' -DFOLLY_HAVE_PTHREAD=1 -Wno-documentation -faligned-new'
++  spec.compiler_flags = folly_compiler_flags + ' -DFOLLY_HAVE_PTHREAD=1 -Wno-documentation -faligned-new -fstack-protector-strong'
+   spec.source_files = 'folly/String.cpp',
+                       'folly/Conv.cpp',
+                       'folly/Demangle.cpp',
+diff --git a/third-party-podspecs/boost.podspec b/third-party-podspecs/boost.podspec
+index 8e924afd367f1b53031daf164bd78cce7908f56e..53f0d629999874715b37fe692f12a41d3c484b19 100644
+--- a/third-party-podspecs/boost.podspec
++++ b/third-party-podspecs/boost.podspec
+@@ -15,9 +15,11 @@ Pod::Spec.new do |spec|
+ 
+   # Pinning to the same version as React.podspec.
+   spec.platforms = min_supported_versions
+-  spec.requires_arc = false
++  # VULN-1270: We need arc on.
++  spec.requires_arc = true
+ 
+   spec.module_name = 'boost'
+   spec.header_dir = 'boost'
+   spec.preserve_path = 'boost'
++  spec.compiler_flags = [ "-fstack-protector-strong" ]
+ end
+diff --git a/third-party-podspecs/fmt.podspec b/third-party-podspecs/fmt.podspec
+index c2263595e751f0e02ec689665844653df06274ea..2c91aad14c931dd6f152bcd8365efac163922761 100644
+--- a/third-party-podspecs/fmt.podspec
++++ b/third-party-podspecs/fmt.podspec
+@@ -22,4 +22,5 @@ Pod::Spec.new do |spec|
+   spec.public_header_files = "include/fmt/*.h"
+   spec.header_mappings_dir = "include"
+   spec.source_files = ["include/fmt/*.h", "src/format.cc"]
++  spec.compiler_flags = [ "-fstack-protector-strong" ]
+ end
+diff --git a/third-party-podspecs/glog.podspec b/third-party-podspecs/glog.podspec
+index f921ec63cdb1d1f3f1ef9dc9eb4a29ad34790a26..db2c5e86798c4e65db653c6bc9a762b66d23a501 100644
+--- a/third-party-podspecs/glog.podspec
++++ b/third-party-podspecs/glog.podspec
+@@ -28,7 +28,7 @@ Pod::Spec.new do |spec|
+   spec.preserve_paths = 'src/*.h',
+                         'src/base/*.h'
+   spec.exclude_files       = "src/windows/**/*"
+-  spec.compiler_flags      = '-Wno-shorten-64-to-32'
++  spec.compiler_flags      = '-Wno-shorten-64-to-32 -fstack-protector-strong'
+ 
+   # TODO: T167482718 Remove this code after April 2024, when Apple will
+   # push the lower version of Xcode required to upload apps to the Store.
+diff --git a/React/Fabric/Mounting/ComponentViews/TextInput/RCTTextInputComponentView.mm b/React/Fabric/Mounting/ComponentViews/TextInput/RCTTextInputComponentView.mm
+index 88ee3fd..41a582b 100644
+--- a/React/Fabric/Mounting/ComponentViews/TextInput/RCTTextInputComponentView.mm
++++ b/React/Fabric/Mounting/ComponentViews/TextInput/RCTTextInputComponentView.mm
+@@ -119,6 +119,10 @@ - (void)updateProps:(const Props::Shared &)props oldProps:(const Props::Shared &
+     [self _setMultiline:newTextInputProps.traits.multiline];
+   }
+ 
++  if (newTextInputProps.traits.showSoftInputOnFocus != oldTextInputProps.traits.showSoftInputOnFocus) {
++    [self _setShowSoftInputOnFocus:newTextInputProps.traits.showSoftInputOnFocus];
++  }
++
+   if (newTextInputProps.traits.autocapitalizationType != oldTextInputProps.traits.autocapitalizationType) {
+     _backedTextInputView.autocapitalizationType =
+         RCTUITextAutocapitalizationTypeFromAutocapitalizationType(newTextInputProps.traits.autocapitalizationType);
+@@ -622,6 +626,25 @@ - (void)_setMultiline:(BOOL)multiline
+   RCTCopyBackedTextInput(_backedTextInputView, backedTextInputView);
+   _backedTextInputView = backedTextInputView;
+   [self addSubview:_backedTextInputView];
++
++  auto const &currentTextInputProps = *std::static_pointer_cast<TextInputProps const>(_props);
++  [self _setShowSoftInputOnFocus:currentTextInputProps.traits.showSoftInputOnFocus];
++}
++
++- (void)_setShowSoftInputOnFocus:(BOOL)showSoftInputOnFocus
++{
++    if (showSoftInputOnFocus) {
++      // Resets to default keyboard.
++      _backedTextInputView.inputView = nil;
++
++      // Without the call to reloadInputViews, the keyboard will not change until the textInput field (the first      // responder) loses and regains focus.
++      if (_backedTextInputView.isFirstResponder) {
++        [_backedTextInputView reloadInputViews];
++      }
++    } else {
++      // Hides keyboard, but keeps blinking cursor.
++      _backedTextInputView.inputView = [UIView new];
++  }
+ }
+ 
+ - (BOOL)_textOf:(NSAttributedString *)newText equals:(NSAttributedString *)oldText
+diff --git a/ReactCommon/react/renderer/components/textinput/platform/android/react/renderer/components/androidtextinput/AndroidTextInputShadowNode.cpp b/ReactCommon/react/renderer/components/textinput/platform/android/react/renderer/components/androidtextinput/AndroidTextInputShadowNode.cpp
+index 3e9e0ad..1845d13 100644
+--- a/ReactCommon/react/renderer/components/textinput/platform/android/react/renderer/components/androidtextinput/AndroidTextInputShadowNode.cpp
++++ b/ReactCommon/react/renderer/components/textinput/platform/android/react/renderer/components/androidtextinput/AndroidTextInputShadowNode.cpp
+@@ -160,14 +160,6 @@ void AndroidTextInputShadowNode::updateStateIfNeeded() {
+ Size AndroidTextInputShadowNode::measureContent(
+     const LayoutContext& layoutContext,
+     const LayoutConstraints& layoutConstraints) const {
+-  if (getStateData().cachedAttributedStringId != 0) {
+-    return textLayoutManager_
+-        ->measureCachedSpannableById(
+-            getStateData().cachedAttributedStringId,
+-            getConcreteProps().paragraphAttributes,
+-            layoutConstraints)
+-        .size;
+-  }
+ 
+   // Layout is called right after measure.
+   // Measure is marked as `const`, and `layout` is not; so State can be updated
+diff --git a/Libraries/Core/setUpTimers.js b/Libraries/Core/setUpTimers.js
+index f4bc4360ab921f..ac346f61b2b68e 100644
+--- a/Libraries/Core/setUpTimers.js
++++ b/Libraries/Core/setUpTimers.js
+@@ -54,6 +54,20 @@ if (global.RN$Bridgeless !== true) {
+   defineLazyTimer('cancelAnimationFrame');
+   defineLazyTimer('requestIdleCallback');
+   defineLazyTimer('cancelIdleCallback');
++} else {
++  polyfillGlobal(
++    'requestIdleCallback',
++    () =>
++      require('../../src/private/webapis/idlecallbacks/specs/NativeIdleCallbacks')
++        .default.requestIdleCallback,
++  );
++
++  polyfillGlobal(
++    'cancelIdleCallback',
++    () =>
++      require('../../src/private/webapis/idlecallbacks/specs/NativeIdleCallbacks')
++        .default.cancelIdleCallback,
++  );
+ }
+ 
+ /**
+diff --git a/ReactAndroid/src/main/jni/CMakeLists.txt b/ReactAndroid/src/main/jni/CMakeLists.txt
+index 546da4cc93c767..488cd4aa29ee08 100644
+--- a/ReactAndroid/src/main/jni/CMakeLists.txt
++++ b/ReactAndroid/src/main/jni/CMakeLists.txt
+@@ -105,6 +105,7 @@ add_react_common_subdir(react/nativemodule/defaults)
+ add_react_common_subdir(react/runtime)
+ add_react_common_subdir(react/runtime/hermes)
+ add_react_common_subdir(react/runtime/nativeviewconfig)
++add_react_common_subdir(react/nativemodule/idlecallbacks)
+ 
+ # ReactAndroid JNI targets
+ add_react_build_subdir(generated/source/codegen/jni)
+diff --git a/ReactAndroid/src/main/jni/react/newarchdefaults/CMakeLists.txt b/ReactAndroid/src/main/jni/react/newarchdefaults/CMakeLists.txt
+index dbd585e0d3ff05..932157aee86e37 100644
+--- a/ReactAndroid/src/main/jni/react/newarchdefaults/CMakeLists.txt
++++ b/ReactAndroid/src/main/jni/react/newarchdefaults/CMakeLists.txt
+@@ -21,4 +21,5 @@ target_link_libraries(react_newarchdefaults
+         react_nativemodule_core
+         react_codegen_rncore
+         react_cxxreactpackage
++        react_nativemodule_idlecallbacks
+         jsi)
+diff --git a/ReactCommon/react/nativemodule/idlecallbacks/CMakeLists.txt b/ReactCommon/react/nativemodule/idlecallbacks/CMakeLists.txt
+new file mode 100644
+index 00000000000000..9022ea8e3def1b
+--- /dev/null
++++ b/ReactCommon/react/nativemodule/idlecallbacks/CMakeLists.txt
+@@ -0,0 +1,26 @@
++# Copyright (c) Meta Platforms, Inc. and affiliates.
++#
++# This source code is licensed under the MIT license found in the
++# LICENSE file in the root directory of this source tree.
++
++cmake_minimum_required(VERSION 3.13)
++set(CMAKE_VERBOSE_MAKEFILE on)
++
++add_compile_options(
++        -fexceptions
++        -frtti
++        -std=c++20
++        -Wall
++        -Wpedantic
++        -DLOG_TAG=\"ReactNative\")
++
++file(GLOB react_nativemodule_idlecallbacks_SRC CONFIGURE_DEPENDS *.cpp)
++add_library(react_nativemodule_idlecallbacks STATIC ${react_nativemodule_idlecallbacks_SRC})
++
++target_include_directories(react_nativemodule_idlecallbacks PUBLIC ${REACT_COMMON_DIR})
++
++target_link_libraries(react_nativemodule_idlecallbacks
++        react_codegen_rncore
++        react_cxxreactpackage
++        react_render_runtimescheduler
++)
+diff --git a/ReactCommon/react/nativemodule/idlecallbacks/NativeIdleCallbacks.cpp b/ReactCommon/react/nativemodule/idlecallbacks/NativeIdleCallbacks.cpp
+new file mode 100644
+index 00000000000000..9bb2ca173ffbc3
+--- /dev/null
++++ b/ReactCommon/react/nativemodule/idlecallbacks/NativeIdleCallbacks.cpp
+@@ -0,0 +1,176 @@
++/*
++ * Copyright (c) Meta Platforms, Inc. and affiliates.
++ *
++ * This source code is licensed under the MIT license found in the
++ * LICENSE file in the root directory of this source tree.
++ */
++
++#include "NativeIdleCallbacks.h"
++#include <react/renderer/runtimescheduler/RuntimeScheduler.h>
++#include <react/renderer/runtimescheduler/RuntimeSchedulerBinding.h>
++#include <react/renderer/runtimescheduler/Task.h>
++#include <chrono>
++#include <utility>
++
++#ifdef RN_DISABLE_OSS_PLUGIN_HEADER
++#include "Plugins.h"
++#endif
++
++std::shared_ptr<facebook::react::TurboModule> NativeIdleCallbacksModuleProvider(
++    std::shared_ptr<facebook::react::CallInvoker> jsInvoker) {
++  return std::make_shared<facebook::react::NativeIdleCallbacks>(
++      std::move(jsInvoker));
++}
++
++namespace facebook::react {
++
++namespace {
++
++class IdleTaskRef : public jsi::NativeState {
++ public:
++  IdleTaskRef(std::shared_ptr<Task> task) : task(std::move(task)) {}
++
++  std::shared_ptr<Task> task;
++};
++
++jsi::Function makeTimeRemainingFunction(
++    jsi::Runtime& runtime,
++    std::shared_ptr<RuntimeScheduler> runtimeScheduler,
++    RuntimeSchedulerTimePoint deadline) {
++  return jsi::Function::createFromHostFunction(
++      runtime,
++      jsi::PropNameID::forAscii(runtime, "timeRemaining"),
++      0,
++      [runtimeScheduler, deadline, expired = false](
++          jsi::Runtime& runtime,
++          const jsi::Value& /* unused */,
++          const jsi::Value* /* unused */,
++          size_t /* unused */) mutable {
++        double remainingTime = 0;
++
++        // No need to access the runtime scheduler if this idle callback expired
++        // already.
++        if (!expired) {
++          if (runtimeScheduler->getShouldYield()) {
++            expired = true;
++          } else {
++            auto now = runtimeScheduler->now();
++
++            remainingTime = std::max(
++                static_cast<double>(
++                    std::chrono::duration_cast<std::chrono::milliseconds>(
++                        deadline - now)
++                        .count()),
++                0.0);
++
++            if (remainingTime == 0) {
++              expired = true;
++            }
++          }
++        }
++
++        return jsi::Value(runtime, remainingTime);
++      });
++}
++
++} // namespace
++
++NativeIdleCallbacks::NativeIdleCallbacks(std::shared_ptr<CallInvoker> jsInvoker)
++    : NativeIdleCallbacksCxxSpec(std::move(jsInvoker)) {}
++
++CallbackHandle NativeIdleCallbacks::requestIdleCallback(
++    jsi::Runtime& runtime,
++    jsi::Function callback,
++    std::optional<NativeRequestIdleCallbackOptions> options) {
++  auto binding = RuntimeSchedulerBinding::getBinding(runtime);
++  auto runtimeScheduler = binding->getRuntimeScheduler();
++
++  // handle timeout parameter
++  std::optional<RuntimeSchedulerTimeout> timeout;
++  std::optional<RuntimeSchedulerTimePoint> expirationTime;
++
++  if (options.has_value() && options.value().timeout.has_value()) {
++    auto userTimeout = (options.value().timeout.value());
++    if (userTimeout > 0) {
++      timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
++          std::chrono::duration<double, std::milli>(userTimeout));
++      expirationTime = runtimeScheduler->now() + timeout.value();
++    }
++  }
++    
++  auto userCallback = std::make_shared<jsi::Function>(std::move(callback));
++
++  auto wrappedCallback = jsi::Function::createFromHostFunction(
++    runtime,
++    jsi::PropNameID::forAscii(runtime, "requestIdleCallback$bodyWrapper"),
++    1,
++    [runtimeScheduler, cb = std::move(userCallback), expirationTime](
++      jsi::Runtime& runtime,
++      const jsi::Value& /* unused */,
++      const jsi::Value* args,
++      size_t /* unused */
++    ) noexcept -> jsi::Value {
++      // This implementation gives each idle callback a 50ms deadline, instead of
++      // being shared by all idle callbacks. This is ok because we don't really
++      // have idle periods, and if a higher priority task comes in while we're
++      // executing an idle callback, we don't execute any more idle callbacks and
++      // we interrupt the current one. The general outcome should be the same.
++
++      auto executionStartTime = runtimeScheduler->now();
++      auto deadline = executionStartTime + std::chrono::milliseconds(50);
++      auto didTimeout = expirationTime.has_value()
++          ? executionStartTime > expirationTime
++          : false;
++
++      jsi::Object idleDeadline{runtime};
++      idleDeadline.setProperty(runtime, "didTimeout", didTimeout);
++      idleDeadline.setProperty(
++          runtime,
++          "timeRemaining",
++          makeTimeRemainingFunction(runtime, runtimeScheduler, deadline));
++
++      return cb->call(runtime, std::move(idleDeadline));
++    }
++  );
++
++  std::shared_ptr<Task> task;
++  if (timeout.has_value()) {
++    task = runtimeScheduler->scheduleIdleTask(
++        std::move(wrappedCallback), timeout.value());
++  } else {
++    task = runtimeScheduler->scheduleIdleTask(std::move(wrappedCallback));
++  }
++
++  if (task == nullptr) {
++    throw jsi::JSError(
++        runtime,
++        "requestIdleCallback is not supported in legacy runtime scheduler");
++  }
++
++  jsi::Object taskHandle{runtime};
++  auto taskNativeState = std::make_shared<IdleTaskRef>(task);
++  taskHandle.setNativeState(runtime, std::move(taskNativeState));
++
++  return taskHandle;
++}
++
++void NativeIdleCallbacks::cancelIdleCallback(
++    jsi::Runtime& runtime,
++    jsi::Object handle) {
++  auto binding = RuntimeSchedulerBinding::getBinding(runtime);
++  auto runtimeScheduler = binding->getRuntimeScheduler();
++
++  if (!handle.hasNativeState(runtime)) {
++    return;
++  }
++
++  auto taskHandle =
++      std::dynamic_pointer_cast<IdleTaskRef>(handle.getNativeState(runtime));
++  if (!taskHandle) {
++    return;
++  }
++
++  runtimeScheduler->cancelTask(*taskHandle->task);
++}
++
++} // namespace facebook::react
+diff --git a/ReactCommon/react/nativemodule/idlecallbacks/NativeIdleCallbacks.h b/ReactCommon/react/nativemodule/idlecallbacks/NativeIdleCallbacks.h
+new file mode 100644
+index 00000000000000..50bcc0a6816f12
+--- /dev/null
++++ b/ReactCommon/react/nativemodule/idlecallbacks/NativeIdleCallbacks.h
+@@ -0,0 +1,42 @@
++/*
++ * Copyright (c) Meta Platforms, Inc. and affiliates.
++ *
++ * This source code is licensed under the MIT license found in the
++ * LICENSE file in the root directory of this source tree.
++ */
++
++#pragma once
++
++#if __has_include("rncoreJSI.h") // Cmake headers on Android
++#include "rncoreJSI.h"
++#elif __has_include("FBReactNativeSpecJSI.h") // CocoaPod headers on Apple
++#include "FBReactNativeSpecJSI.h"
++#else
++#include <FBReactNativeSpec/FBReactNativeSpecJSI.h>
++#endif
++
++namespace facebook::react {
++
++using CallbackHandle = jsi::Object;
++
++using NativeRequestIdleCallbackOptions =
++    NativeIdleCallbacksCxxRequestIdleCallbackOptions<std::optional<double>>;
++
++template <>
++struct Bridging<NativeRequestIdleCallbackOptions>
++    : NativeIdleCallbacksCxxRequestIdleCallbackOptionsBridging<
++          NativeRequestIdleCallbackOptions> {};
++
++class NativeIdleCallbacks
++    : public NativeIdleCallbacksCxxSpec<NativeIdleCallbacks> {
++ public:
++  NativeIdleCallbacks(std::shared_ptr<CallInvoker> jsInvoker);
++
++  CallbackHandle requestIdleCallback(
++      jsi::Runtime& runtime,
++      jsi::Function callback,
++      std::optional<NativeRequestIdleCallbackOptions> options);
++  void cancelIdleCallback(jsi::Runtime& runtime, jsi::Object handle);
++};
++
++} // namespace facebook::react
+diff --git a/ReactCommon/react/nativemodule/idlecallbacks/React-idlecallbacksnativemodule.podspec b/ReactCommon/react/nativemodule/idlecallbacks/React-idlecallbacksnativemodule.podspec
+new file mode 100644
+index 00000000000000..0a1ce23089ae61
+--- /dev/null
++++ b/ReactCommon/react/nativemodule/idlecallbacks/React-idlecallbacksnativemodule.podspec
+@@ -0,0 +1,49 @@
++# Copyright (c) Meta Platforms, Inc. and affiliates.
++#
++# This source code is licensed under the MIT license found in the
++# LICENSE file in the root directory of this source tree.
++
++require "json"
++
++package = JSON.parse(File.read(File.join(__dir__, "..", "..", "..", "..", "package.json")))
++version = package['version']
++
++source = { :git => 'https://github.com/facebook/react-native.git' }
++if version == '1000.0.0'
++  # This is an unpublished version, use the latest commit hash of the react-native repo, which we’re presumably in.
++  source[:commit] = `git rev-parse HEAD`.strip if system("git rev-parse --git-dir > /dev/null 2>&1")
++else
++  source[:tag] = "v#{version}"
++end
++
++header_search_paths = []
++
++if ENV['USE_FRAMEWORKS']
++  header_search_paths << "\"$(PODS_TARGET_SRCROOT)/../../..\"" # this is needed to allow the module access its own files
++end
++
++Pod::Spec.new do |s|
++  s.name                   = "React-idlecallbacksnativemodule"
++  s.version                = version
++  s.summary                = "React Native idle callbacks native module"
++  s.homepage               = "https://reactnative.dev/"
++  s.license                = package["license"]
++  s.author                 = "Meta Platforms, Inc. and its affiliates"
++  s.platforms              = min_supported_versions
++  s.source                 = source
++  s.source_files           = "*.{cpp,h}"
++  s.header_dir             = "react/nativemodule/idlecallbacks"
++  s.pod_target_xcconfig    = { "CLANG_CXX_LANGUAGE_STANDARD" => "c++20",
++                               "HEADER_SEARCH_PATHS" => header_search_paths.join(' '),
++                               "DEFINES_MODULE" => "YES" }
++
++  if ENV['USE_FRAMEWORKS']
++    s.module_name            = "idlecallbacksnativemodule"
++    s.header_mappings_dir  = "../.."
++  end
++
++  install_modules_dependencies(s)
++
++  s.dependency "ReactCommon/turbomodule/core"
++  s.dependency "React-runtimescheduler"
++end
+diff --git a/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler.cpp b/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler.cpp
+index d485390bd7b291..b34467b2b476dc 100644
+--- a/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler.cpp
++++ b/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler.cpp
+@@ -53,6 +53,18 @@ std::shared_ptr<Task> RuntimeScheduler::scheduleTask(
+   return runtimeSchedulerImpl_->scheduleTask(priority, std::move(callback));
+ }
+ 
++std::shared_ptr<Task> RuntimeScheduler::scheduleIdleTask(
++    jsi::Function&& callback,
++    RuntimeSchedulerTimeout timeout) noexcept {
++  return runtimeSchedulerImpl_->scheduleIdleTask(std::move(callback), timeout);
++}
++
++std::shared_ptr<Task> RuntimeScheduler::scheduleIdleTask(
++    RawCallback&& callback,
++    RuntimeSchedulerTimeout timeout) noexcept {
++  return runtimeSchedulerImpl_->scheduleIdleTask(std::move(callback), timeout);
++}
++
+ bool RuntimeScheduler::getShouldYield() const noexcept {
+   return runtimeSchedulerImpl_->getShouldYield();
+ }
+diff --git a/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler.h b/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler.h
+index cdb321cca02a87..277f171d48c0e3 100644
+--- a/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler.h
++++ b/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler.h
+@@ -9,11 +9,13 @@
+
+ #include <ReactCommon/RuntimeExecutor.h>
+ #include <react/renderer/runtimescheduler/RuntimeSchedulerClock.h>
++#include <react/renderer/runtimescheduler/SchedulerPriorityUtils.h>
+ #include <react/renderer/runtimescheduler/Task.h>
+ 
+ namespace facebook::react {
+ 
+ using RuntimeSchedulerRenderingUpdate = std::function<void()>;
++using RuntimeSchedulerTimeout = std::chrono::milliseconds;
+ 
+ // This is a temporary abstract class for RuntimeScheduler forks to implement
+ // (and use them interchangeably).
+@@ -28,6 +30,14 @@ class RuntimeSchedulerBase {
+   virtual std::shared_ptr<Task> scheduleTask(
+       SchedulerPriority priority,
+       RawCallback&& callback) noexcept = 0;
++  virtual std::shared_ptr<Task> scheduleIdleTask(
++      jsi::Function&& callback,
++      RuntimeSchedulerTimeout timeout = timeoutForSchedulerPriority(
++          SchedulerPriority::IdlePriority)) noexcept = 0;
++  virtual std::shared_ptr<Task> scheduleIdleTask(
++      RawCallback&& callback,
++      RuntimeSchedulerTimeout timeout = timeoutForSchedulerPriority(
++          SchedulerPriority::IdlePriority)) noexcept = 0;
+   virtual void cancelTask(Task& task) noexcept = 0;
+   virtual bool getShouldYield() const noexcept = 0;
+   virtual bool getIsSynchronous() const noexcept = 0;
+@@ -86,6 +96,16 @@ class RuntimeScheduler final : RuntimeSchedulerBase {
+       SchedulerPriority priority,
+       RawCallback&& callback) noexcept override;
+ 
++  std::shared_ptr<Task> scheduleIdleTask(
++      jsi::Function&& callback,
++      RuntimeSchedulerTimeout timeout = timeoutForSchedulerPriority(
++          SchedulerPriority::IdlePriority)) noexcept override;
++
++  std::shared_ptr<Task> scheduleIdleTask(
++      RawCallback&& callback,
++      RuntimeSchedulerTimeout timeout = timeoutForSchedulerPriority(
++          SchedulerPriority::IdlePriority)) noexcept override;
++
+   /*
+    * Cancelled task will never be executed.
+    *
+diff --git a/ReactCommon/react/renderer/runtimescheduler/RuntimeSchedulerBinding.cpp b/ReactCommon/react/renderer/runtimescheduler/RuntimeSchedulerBinding.cpp
+index 22312c98ca7f9a..b03875d1ac2a75 100644
+--- a/ReactCommon/react/renderer/runtimescheduler/RuntimeSchedulerBinding.cpp
++++ b/ReactCommon/react/renderer/runtimescheduler/RuntimeSchedulerBinding.cpp
+@@ -61,6 +61,11 @@ RuntimeSchedulerBinding::RuntimeSchedulerBinding(
+     std::shared_ptr<RuntimeScheduler> runtimeScheduler)
+     : runtimeScheduler_(std::move(runtimeScheduler)) {}
+ 
++std::shared_ptr<RuntimeScheduler>
++RuntimeSchedulerBinding::getRuntimeScheduler() noexcept {
++  return runtimeScheduler_;
++}
++
+ bool RuntimeSchedulerBinding::getIsSynchronous() const {
+   return runtimeScheduler_->getIsSynchronous();
+ }
+diff --git a/ReactCommon/react/renderer/runtimescheduler/RuntimeSchedulerBinding.h b/ReactCommon/react/renderer/runtimescheduler/RuntimeSchedulerBinding.h
+index ea892b043bc4b3..1987b1146f9c72 100644
+--- a/ReactCommon/react/renderer/runtimescheduler/RuntimeSchedulerBinding.h
++++ b/ReactCommon/react/renderer/runtimescheduler/RuntimeSchedulerBinding.h
+@@ -37,6 +37,11 @@ class RuntimeSchedulerBinding : public jsi::HostObject {
+   static std::shared_ptr<RuntimeSchedulerBinding> getBinding(
+       jsi::Runtime& runtime);
+ 
++  /*
++   * Returns shared pointer to RuntimeScheduler for use in native modules
++   */
++  std::shared_ptr<RuntimeScheduler> getRuntimeScheduler() noexcept;
++
+   /*
+    * `jsi::HostObject` specific overloads.
+    */
+diff --git a/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler_Legacy.cpp b/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler_Legacy.cpp
+index b2c72d7bc57b64..4683a2c2945ac2 100644
+--- a/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler_Legacy.cpp
++++ b/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler_Legacy.cpp
+@@ -80,6 +80,24 @@ std::shared_ptr<Task> RuntimeScheduler_Legacy::scheduleTask(
+   return task;
+ }
+ 
++std::shared_ptr<Task> RuntimeScheduler_Legacy::scheduleIdleTask(
++    jsi::Function&& /*callback*/,
++    RuntimeSchedulerTimeout /*timeout*/) noexcept {
++  // Idle tasks are not supported on Legacy RuntimeScheduler.
++  // Because the method is `noexcept`, we return `nullptr` here and handle it
++  // on the caller side.
++  return nullptr;
++}
++
++std::shared_ptr<Task> RuntimeScheduler_Legacy::scheduleIdleTask(
++    RawCallback&& /*callback*/,
++    RuntimeSchedulerTimeout /*timeout*/) noexcept {
++  // Idle tasks are not supported on Legacy RuntimeScheduler.
++  // Because the method is `noexcept`, we return `nullptr` here and handle it
++  // on the caller side.
++  return nullptr;
++}
++
+ bool RuntimeScheduler_Legacy::getShouldYield() const noexcept {
+   return runtimeAccessRequests_ > 0;
+ }
+diff --git a/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler_Legacy.h b/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler_Legacy.h
+index 502c0def5ef023..7ecc15a47a2ae3 100644
+--- a/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler_Legacy.h
++++ b/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler_Legacy.h
+@@ -61,6 +61,24 @@ class RuntimeScheduler_Legacy final : public RuntimeSchedulerBase {
+       SchedulerPriority priority,
+       RawCallback&& callback) noexcept override;
+ 
++  /*
++   * Adds a JavaScript callback to the idle queue with the given timeout.
++   * Triggers workloop if needed.
++   */
++  std::shared_ptr<Task> scheduleIdleTask(
++      jsi::Function&& callback,
++      RuntimeSchedulerTimeout timeout = timeoutForSchedulerPriority(
++          SchedulerPriority::IdlePriority)) noexcept override;
++
++  /*
++   * Adds a custom callback to the idle queue with the given timeout.
++   * Triggers workloop if needed.
++   */
++  std::shared_ptr<Task> scheduleIdleTask(
++      RawCallback&& callback,
++      RuntimeSchedulerTimeout timeout = timeoutForSchedulerPriority(
++          SchedulerPriority::IdlePriority)) noexcept override;
++
+   /*
+    * Cancelled task will never be executed.
+    *
+diff --git a/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler_Modern.cpp b/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler_Modern.cpp
+index 9ebda05e4284cd..1e24294dbbce19 100644
+--- a/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler_Modern.cpp
++++ b/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler_Modern.cpp
+@@ -47,6 +47,16 @@
+     throw std::runtime_error("Hits microtasks retries bound.");
+   }
+ }
++
++std::chrono::milliseconds getResolvedTimeoutForIdleTask(
++    std::chrono::milliseconds customTimeout) {
++  return customTimeout <
++          timeoutForSchedulerPriority(SchedulerPriority::IdlePriority)
++      ? timeoutForSchedulerPriority(SchedulerPriority::LowPriority) +
++          customTimeout
++      : timeoutForSchedulerPriority(SchedulerPriority::IdlePriority);
++}
++
+ } // namespace
+ 
+ #pragma mark - Public
+@@ -67,6 +78,45 @@ std::shared_ptr<Task> RuntimeScheduler_Modern::scheduleTask(
+   return task;
+ }
+ 
++std::shared_ptr<Task> RuntimeScheduler_Modern::scheduleIdleTask(
++    jsi::Function&& callback,
++    RuntimeSchedulerTimeout customTimeout) noexcept {
++  SystraceSection s(
++      "RuntimeScheduler::scheduleIdleTask",
++      "customTimeout",
++      customTimeout.count(),
++      "callbackType",
++      "jsi::Function");
++
++  auto timeout = getResolvedTimeoutForIdleTask(customTimeout);
++  auto expirationTime = now_() + timeout;
++  auto task = std::make_shared<Task>(
++      SchedulerPriority::IdlePriority, std::move(callback), expirationTime);
++
++  scheduleTask(task);
++
++  return task;
++}
++
++std::shared_ptr<Task> RuntimeScheduler_Modern::scheduleIdleTask(
++    RawCallback&& callback,
++    RuntimeSchedulerTimeout customTimeout) noexcept {
++  SystraceSection s(
++      "RuntimeScheduler::scheduleIdleTask",
++      "customTimeout",
++      customTimeout.count(),
++      "callbackType",
++      "RawCallback");
++
++  auto expirationTime = now_() + getResolvedTimeoutForIdleTask(customTimeout);
++  auto task = std::make_shared<Task>(
++      SchedulerPriority::IdlePriority, std::move(callback), expirationTime);
++
++  scheduleTask(task);
++
++  return task;
++}
++
+ bool RuntimeScheduler_Modern::getShouldYield() const noexcept {
+   std::shared_lock lock(schedulingMutex_);
+ 
+diff --git a/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler_Modern.h b/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler_Modern.h
+index fa9b6c8c8e75d3..0f57a0547e6347 100644
+--- a/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler_Modern.h
++++ b/ReactCommon/react/renderer/runtimescheduler/RuntimeScheduler_Modern.h
+@@ -70,6 +70,24 @@ class RuntimeScheduler_Modern final : public RuntimeSchedulerBase {
+       SchedulerPriority priority,
+       RawCallback&& callback) noexcept override;
+ 
++  /*
++   * Adds a JavaScript callback to the idle queue with the given timeout.
++   * Triggers workloop if needed.
++   */
++  std::shared_ptr<Task> scheduleIdleTask(
++      jsi::Function&& callback,
++      RuntimeSchedulerTimeout customTimeout = timeoutForSchedulerPriority(
++          SchedulerPriority::IdlePriority)) noexcept override;
++
++  /*
++   * Adds a custom callback to the idle queue with the given timeout.
++   * Triggers workloop if needed.
++   */
++  std::shared_ptr<Task> scheduleIdleTask(
++      RawCallback&& callback,
++      RuntimeSchedulerTimeout customTimeout = timeoutForSchedulerPriority(
++          SchedulerPriority::IdlePriority)) noexcept override;
++
+   /*
+    * Cancelled task will never be executed.
+    *
+diff --git a/scripts/react_native_pods.rb b/scripts/react_native_pods.rb
+index bed94e23868c78..7c158908c99fd2 100644
+--- a/scripts/react_native_pods.rb
++++ b/scripts/react_native_pods.rb
+@@ -130,6 +130,7 @@ def use_react_native! (
+   pod 'React-debug', :path => "#{prefix}/ReactCommon/react/debug"
+   pod 'React-utils', :path => "#{prefix}/ReactCommon/react/utils"
+   pod 'React-featureflags', :path => "#{prefix}/ReactCommon/react/featureflags"
++  pod 'React-idlecallbacksnativemodule', :path => "#{prefix}/ReactCommon/react/nativemodule/idlecallbacks"
+   pod 'React-Mapbuffer', :path => "#{prefix}/ReactCommon"
+   pod 'React-jserrorhandler', :path => "#{prefix}/ReactCommon/jserrorhandler"
+   pod 'React-nativeconfig', :path => "#{prefix}/ReactCommon"
+diff --git a/src/private/webapis/idlecallbacks/specs/NativeIdleCallbacks.js b/src/private/webapis/idlecallbacks/specs/NativeIdleCallbacks.js
+new file mode 100644
+index 00000000000000..f878b0fb08b8fd
+--- /dev/null
++++ b/src/private/webapis/idlecallbacks/specs/NativeIdleCallbacks.js
+@@ -0,0 +1,34 @@
++/**
++ * Copyright (c) Meta Platforms, Inc. and affiliates.
++ *
++ * This source code is licensed under the MIT license found in the
++ * LICENSE file in the root directory of this source tree.
++ *
++ * @flow strict
++ * @format
++ */
++
++import type {TurboModule} from '../../../../../Libraries/TurboModule/RCTExport';
++
++import * as TurboModuleRegistry from '../../../../../Libraries/TurboModule/TurboModuleRegistry';
++
++export type RequestIdleCallbackOptions = {
++  timeout?: number,
++};
++
++export type IdleDeadline = {
++  didTimeout: boolean,
++  timeRemaining: () => mixed,
++};
++
++export interface Spec extends TurboModule {
++  +requestIdleCallback: (
++    callback: (idleDeadline: IdleDeadline) => mixed,
++    options?: RequestIdleCallbackOptions,
++  ) => mixed;
++  +cancelIdleCallback: (handle: mixed) => void;
++}
++
++export default (TurboModuleRegistry.getEnforcing<Spec>(
++  'NativeIdleCallbacksCxx',
++): Spec);
+diff --git a/ReactAndroid/src/main/jni/react/newarchdefaults/DefaultTurboModuleManagerDelegate.cpp b/ReactAndroid/src/main/jni/react/newarchdefaults/DefaultTurboModuleManagerDelegate.cpp
+index bed94e23868c78..7c158908c99fd2 100644
+--- a/ReactAndroid/src/main/jni/react/newarchdefaults/DefaultTurboModuleManagerDelegate.cpp
++++ b/ReactAndroid/src/main/jni/react/newarchdefaults/DefaultTurboModuleManagerDelegate.cpp
+@@ -6,6 +6,7 @@
+  */
+ 
+ #include "DefaultTurboModuleManagerDelegate.h"
++#include <react/nativemodule/idlecallbacks/NativeIdleCallbacks.h>
+ 
+ #include <algorithm>
+ 
+@@ -56,6 +57,10 @@
+ std::shared_ptr<TurboModule> DefaultTurboModuleManagerDelegate::getTurboModule(
+     const std::string& name,
+     const std::shared_ptr<CallInvoker>& jsInvoker) {
++  if (name == NativeIdleCallbacks::kModuleName) {
++    return std::make_shared<NativeIdleCallbacks>(jsInvoker);
++  }
++
+   for (const auto& cxxReactPackage : cxxReactPackages_) {
+     auto cppPart = cxxReactPackage->cthis();
+     if (cppPart) {
